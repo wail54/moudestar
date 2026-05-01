@@ -28,6 +28,10 @@ export function CaisseSystem() {
   const [email, setEmail] = useState('');
   const [sizeModalProduct, setSizeModalProduct] = useState<Product | null>(null);
 
+  const [showPayment, setShowPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card');
+  const [cashGiven, setCashGiven] = useState('');
+
   const results = useMemo(() => {
     if (!query.trim()) return products;
     const q = query.toLowerCase();
@@ -76,8 +80,12 @@ export function CaisseSystem() {
   const total = discounted + tva;
   const hasItems = posCart.length > 0 || freeItems.length > 0;
 
-  const handleEncaisser = () => {
+  const handleEncaisserClick = () => {
     if (!hasItems) return;
+    setShowPayment(true);
+  };
+
+  const confirmPayment = () => {
     const freeCartItems: CartItem[] = freeItems.map((fi) => ({
       product: { id: fi.id, name: fi.name, price: fi.price, description: '', image: '', category: 'Libre' }, quantity: 1
     }));
@@ -85,8 +93,12 @@ export function CaisseSystem() {
     
     if (email) showToast(`Ticket envoyé à ${email}`, 'success');
     
+    setShowPayment(false);
     setConfirmed(true);
-    setTimeout(() => { setPosCart([]); setFreeItems([]); setDiscountValue(''); setEmail(''); setConfirmed(false); }, 3000);
+    setTimeout(() => { 
+      setPosCart([]); setFreeItems([]); setDiscountValue(''); setEmail(''); 
+      setPaymentMethod('card'); setCashGiven(''); setConfirmed(false); 
+    }, 4000);
   };
 
   if (confirmed) {
@@ -145,6 +157,52 @@ export function CaisseSystem() {
                 <input className="w-full px-4 py-3 bg-[var(--bg-alt)] border border-transparent focus:border-[var(--text-main)] rounded-sm outline-none text-sm" type="number" placeholder="Prix HT (€)" value={freePrice} onChange={(e) => setFreePrice(e.target.value)} />
               </div>
               <button onClick={addFreeItem} className="btn-primary w-full mt-6 py-4 rounded-sm">Ajouter</button>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {showPayment && (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div className="bg-white p-8 w-full max-w-sm rounded-sm shadow-xl" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-cormorant text-2xl font-light">Encaissement</h3>
+                <button onClick={() => setShowPayment(false)} className="text-[var(--text-muted)] hover:text-black"><X size={20} /></button>
+              </div>
+              
+              <div className="flex gap-4 mb-6">
+                <button onClick={() => setPaymentMethod('card')} className={`flex-1 py-3 text-sm font-medium rounded-sm border transition-colors ${paymentMethod === 'card' ? 'bg-black text-white border-black' : 'bg-white border-[var(--border-soft)] hover:border-black text-black'}`}>Carte (CB)</button>
+                <button onClick={() => setPaymentMethod('cash')} className={`flex-1 py-3 text-sm font-medium rounded-sm border transition-colors ${paymentMethod === 'cash' ? 'bg-black text-white border-black' : 'bg-white border-[var(--border-soft)] hover:border-black text-black'}`}>Espèces</button>
+              </div>
+
+              {paymentMethod === 'cash' && (
+                <div className="mb-6 space-y-4">
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Montant remis (€)</label>
+                    <input type="number" step="0.01" min="0" value={cashGiven} onChange={(e) => setCashGiven(e.target.value)} className="w-full px-4 py-3 bg-[var(--bg-alt)] border border-transparent focus:border-[var(--text-main)] rounded-sm outline-none text-sm" placeholder="ex: 50.00" />
+                  </div>
+                  {(parseFloat(cashGiven) || 0) >= total ? (
+                    <div className="p-4 bg-green-50 text-green-700 rounded-sm border border-green-100">
+                      <p className="text-[10px] uppercase tracking-widest font-medium mb-1 text-green-600">Monnaie à rendre</p>
+                      <p className="text-2xl font-medium">{((parseFloat(cashGiven) || 0) - total).toFixed(2)} €</p>
+                    </div>
+                  ) : cashGiven ? (
+                    <p className="text-sm text-red-500 font-medium px-2">Montant insuffisant</p>
+                  ) : null}
+                </div>
+              )}
+
+              <div className="flex justify-between items-center mb-6 py-4 border-t border-[var(--border-soft)]">
+                <span className="text-sm font-medium">Total à régler</span>
+                <span className="text-xl font-medium">{total.toFixed(2)} €</span>
+              </div>
+
+              <button 
+                onClick={confirmPayment} 
+                disabled={paymentMethod === 'cash' && (parseFloat(cashGiven) || 0) < total} 
+                className="btn-primary w-full py-4 rounded-sm"
+              >
+                Valider
+              </button>
             </motion.div>
           </motion.div>
         )}
@@ -265,7 +323,7 @@ export function CaisseSystem() {
                   <span>Total TTC</span><span>{total.toFixed(2)} €</span>
                 </div>
               </div>
-              <button onClick={handleEncaisser} disabled={!hasItems} className="btn-primary w-full rounded-sm py-4">
+              <button onClick={handleEncaisserClick} disabled={!hasItems} className="btn-primary w-full rounded-sm py-4">
                 Encaisser
               </button>
             </div>
