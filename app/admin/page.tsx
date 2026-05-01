@@ -75,7 +75,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[var(--bg-main)]">
+    <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg-main)]">
       
       {/* ── Modals ── */}
       <AnimatePresence>
@@ -139,39 +139,42 @@ export default function AdminPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Sidebar ── */}
-      <aside className="w-64 flex flex-col border-r border-[var(--border-soft)] bg-white sticky top-0 h-screen">
-        <div className="px-8 py-8 border-b border-[var(--border-soft)]">
-          <Link href="/" className="font-cormorant text-2xl font-light tracking-widest uppercase text-black hover:text-[var(--text-muted)] transition-colors">
-            Moudestar
-          </Link>
-          <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--text-muted)] mt-2 font-medium">Panel Admin</p>
+      {/* ── Sidebar / Topbar ── */}
+      <aside className="w-full md:w-64 flex flex-col md:border-r border-b border-[var(--border-soft)] bg-white md:sticky md:top-0 md:h-screen z-40">
+        <div className="px-6 md:px-8 py-6 md:py-8 border-b border-[var(--border-soft)] flex items-center justify-between">
+          <div>
+            <Link href="/" className="font-cormorant text-xl md:text-2xl font-light tracking-widest uppercase text-black hover:text-[var(--text-muted)] transition-colors">
+              Moudestar
+            </Link>
+            <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--text-muted)] mt-1 font-medium">Panel Admin</p>
+          </div>
+          <Link href="/" className="md:hidden text-[10px] uppercase tracking-widest border border-[var(--border-soft)] px-3 py-1 rounded-sm text-black hover:bg-[var(--bg-alt)]">Retour</Link>
         </div>
 
-        <nav className="flex-1 py-6 flex flex-col px-4 gap-1">
+        <nav className="flex-1 p-4 md:py-6 flex md:flex-col gap-2 overflow-x-auto hide-scrollbar whitespace-nowrap">
           {[
             { id: 'orders', label: 'Commandes', icon: LayoutDashboard },
             { id: 'products', label: 'Produits', icon: Package },
-            { id: 'add', label: 'Nouveau Produit', icon: PlusCircle },
-            { id: 'caisse', label: 'Caisse POS', icon: Landmark },
+            { id: 'add', label: 'Nouveau', icon: PlusCircle },
+            { id: 'caisse', label: 'Caisse', icon: Landmark },
           ].map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id as Tab)}
-              className={`w-full flex items-center gap-4 px-4 py-4 text-[11px] font-medium tracking-widest uppercase rounded-sm transition-all ${
-                tab === item.id ? 'bg-black text-white' : 'text-[var(--text-muted)] hover:text-black hover:bg-[var(--bg-alt)]'
+              className={`flex items-center gap-3 px-4 py-3 md:py-4 text-[10px] md:text-[11px] font-medium tracking-widest uppercase rounded-sm transition-all ${
+                tab === item.id ? 'bg-black text-white' : 'text-[var(--text-muted)] hover:text-black hover:bg-[var(--bg-alt)] border border-transparent hover:border-[var(--border-soft)]'
               }`}
             >
-              <item.icon size={16} />
-              {item.label}
+              <item.icon size={16} className="shrink-0" />
+              <span>{item.label}</span>
             </button>
           ))}
         </nav>
       </aside>
 
       {/* ── Content ── */}
-      <div className="flex-1 overflow-auto bg-[var(--bg-alt)]">
-        <div className="max-w-6xl mx-auto p-10 md:p-14">
+      <div className="flex-1 overflow-x-hidden bg-[var(--bg-alt)]">
+        <div className="max-w-6xl mx-auto p-4 md:p-10 lg:p-14">
           <AnimatePresence mode="wait">
             
             {/* ORDERS */}

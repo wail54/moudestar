@@ -153,7 +153,7 @@ export function CaisseSystem() {
       <div className="flex flex-col xl:flex-row bg-white border border-[var(--border-soft)] rounded-sm shadow-sm overflow-hidden min-h-[600px]">
         
         {/* LEFT CATALOG */}
-        <div className="flex-1 flex flex-col border-r border-[var(--border-soft)]">
+        <div className="flex-1 flex flex-col xl:border-r border-b xl:border-b-0 border-[var(--border-soft)] h-[60vh] xl:h-auto">
           <div className="relative border-b border-[var(--border-soft)]">
             <Search size={16} className="absolute left-6 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input type="text" placeholder="Rechercher par nom ou catégorie..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full pl-14 pr-6 py-5 text-sm outline-none bg-transparent" />
