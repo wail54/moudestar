@@ -1,86 +1,97 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useStore } from '@/store/useStore';
 import { ProductCard } from '@/components/ProductCard';
 
-const CATEGORIES = ['Tous', 'Vêtements', 'Accessoires', 'Chaussures'];
+const CATS = ['Tous', 'Vêtements', 'Accessoires', 'Chaussures'];
+
+const fadeUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+};
 
 export default function BoutiquePage() {
+  const [mounted, setMounted] = useState(false);
   const products = useStore((s) => s.products);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('Tous');
+  const [cat, setCat] = useState('Tous');
 
-  const filtered = useMemo(() => {
-    return products.filter((p) => {
-      const matchCat = category === 'Tous' || p.category === category;
-      const matchQ = p.name.toLowerCase().includes(query.toLowerCase());
-      return matchCat && matchQ;
-    });
-  }, [products, query, category]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const filtered = useMemo(() => products.filter((p) => {
+    const mc = cat === 'Tous' || p.category === cat;
+    const mq = p.name.toLowerCase().includes(query.toLowerCase());
+    return mc && mq;
+  }), [products, query, cat]);
 
   return (
-    <div className="min-h-screen pt-20">
-      {/* Banner */}
-      <div className="relative py-20 text-center overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 bg-gradient-to-b from-[var(--dark-2)] to-[var(--dark)]" />
-        <div className="relative z-10">
-          <p className="text-[var(--gold)] text-xs tracking-[0.5em] uppercase mb-3">Notre sélection</p>
-          <h1 className="font-cormorant text-6xl md:text-7xl font-light text-white">La Boutique</h1>
-          <div className="w-12 h-px bg-[var(--gold)] mx-auto mt-5" />
-        </div>
-      </div>
-
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-10">
-          <div className="flex gap-2 flex-wrap">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                className={`px-4 py-2 text-xs tracking-widest uppercase rounded transition-all duration-200 ${
-                  category === cat
-                    ? 'bg-[var(--gold)] text-[var(--dark)] font-semibold'
-                    : 'border border-[var(--gray-1)] text-[var(--gray-3)] hover:border-[var(--gold)] hover:text-[var(--gold)]'
-                }`}
+    <div className="min-h-screen pt-24 pb-32">
+      <div className="max-w-screen-xl mx-auto px-6 md:px-10">
+        
+        {/* Header */}
+        <div className="py-12 border-b border-[var(--border-soft)] mb-8 flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div>
+            <span className="mask-wrap block mb-4">
+              <motion.h1 
+                initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                className="font-cormorant text-5xl md:text-7xl font-light tracking-tight"
               >
-                {cat}
+                La Boutique
+              </motion.h1>
+            </span>
+            <p className="text-sm text-[var(--text-muted)]">Découvrez notre collection complète de pièces d&apos;exception.</p>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+            <span>{filtered.length} article{filtered.length > 1 ? 's' : ''}</span>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-12">
+          <div className="flex flex-wrap items-center gap-2">
+            {CATS.map((c) => (
+              <button key={c} onClick={() => setCat(c)} className={`px-5 py-2.5 text-[10px] tracking-widest uppercase font-medium rounded-sm transition-all ${
+                cat === c ? 'bg-[var(--text-main)] text-white' : 'bg-[var(--bg-alt)] text-[var(--text-muted)] hover:bg-[var(--border-soft)] hover:text-black'
+              }`}>
+                {c}
               </button>
             ))}
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--gray-2)]" />
-            <input
-              type="text"
-              placeholder="Rechercher..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 bg-[var(--dark-2)] border border-[var(--gray-1)] focus:border-[var(--gold)] text-[var(--light)] text-sm rounded outline-none transition-colors placeholder:text-[var(--gray-2)]"
-            />
+          <div className="relative w-full md:w-64">
+            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input type="text" placeholder="Rechercher..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-[var(--bg-alt)] text-sm outline-none rounded-sm focus:ring-1 focus:ring-black" />
           </div>
         </div>
 
-        <p className="text-xs text-[var(--gray-3)] tracking-widest uppercase mb-6">
-          {filtered.length} produit{filtered.length !== 1 ? 's' : ''}
-        </p>
-
         {/* Grid */}
-        {filtered.length === 0 ? (
-          <div className="text-center py-24 text-[var(--gray-3)]">
-            <p className="font-cormorant text-3xl mb-2">Aucun résultat</p>
-            <p className="text-sm">Essayez d&apos;autres mots-clés ou catégories.</p>
+        {!mounted ? (
+          <div className="py-32" />
+        ) : filtered.length === 0 ? (
+          <div className="py-32 text-center bg-[var(--bg-alt)] rounded-sm">
+            <p className="font-cormorant text-3xl mb-2">Aucun article trouvé</p>
+            <p className="text-sm text-[var(--text-muted)]">Essayez d&apos;autres critères de recherche.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {filtered.map((product) => (
-              <ProductCard key={product.id} product={product} />
+          <motion.div
+            initial="initial" animate="animate"
+            variants={{ animate: { transition: { staggerChildren: 0.08 } } }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16"
+          >
+            {filtered.map((p) => (
+              <motion.div key={p.id} variants={fadeUp}>
+                <ProductCard product={p} />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
-      </section>
+
+      </div>
     </div>
   );
 }

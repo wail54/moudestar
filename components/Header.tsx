@@ -3,23 +3,28 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ShoppingBag, Menu, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/store/useStore';
-import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const cart = useStore((s) => s.cart);
   const toggleCart = useStore((s) => s.toggleCart);
-  const router = useRouter();
-
-  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith('/admin');
+  const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
+    const fn = () => setScrolled(window.scrollY > 30);
+    window.addEventListener('scroll', fn);
+    return () => window.removeEventListener('scroll', fn);
   }, []);
+
+  if (isAdmin) return null;
+
+  const onHero = pathname === '/' && !scrolled;
 
   const links = [
     { href: '/', label: 'Accueil' },
@@ -28,104 +33,82 @@ export function Header() {
 
   return (
     <>
-      <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled ? 'bg-dark/95 backdrop-blur-md border-b border-white/5 shadow-lg' : 'bg-transparent'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 md:h-20">
-            {/* Burger - mobile */}
-            <button
-              className="md:hidden p-2 text-[var(--light)] hover:text-[var(--gold)] transition-colors"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Menu"
-            >
-              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+      <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 border-b ${
+        onHero ? 'border-transparent bg-transparent' : 'border-[var(--border-soft)] glass-header'
+      }`}>
+        <div className="max-w-screen-xl mx-auto px-6 md:px-10">
+          <div className={`flex items-center justify-between transition-all duration-300 ${scrolled ? 'h-16' : 'h-24'}`}>
+            
+            {/* Mobile Menu Toggle */}
+            <button className="md:hidden" onClick={() => setMobileOpen(true)} aria-label="Menu">
+              <Menu size={20} className={onHero ? 'text-white' : 'text-[var(--text-main)]'} />
             </button>
 
             {/* Logo */}
-            <Link
-              href="/"
-              className="font-cormorant text-2xl md:text-3xl font-light tracking-[0.3em] uppercase text-[var(--white)] hover:text-[var(--gold)] transition-colors duration-300"
-            >
+            <Link href="/" className={`font-cormorant text-2xl md:text-3xl tracking-[0.25em] uppercase transition-colors ${
+              onHero ? 'text-white hover:text-white/80' : 'text-[var(--text-main)] hover:text-[var(--text-muted)]'
+            }`}>
               Moudestar
             </Link>
 
             {/* Desktop Nav */}
-            <nav className="hidden md:flex items-center gap-8">
+            <nav className="hidden md:flex items-center gap-10">
               {links.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className="text-sm tracking-widest uppercase text-[var(--gray-4)] hover:text-[var(--white)] transition-colors duration-200"
-                >
+                <Link key={l.href} href={l.href} className={`text-[11px] tracking-[0.15em] uppercase font-medium transition-colors ${
+                  onHero ? 'text-white/90 hover:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}>
                   {l.label}
                 </Link>
               ))}
             </nav>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 md:gap-4">
-              <button
-                onClick={toggleCart}
-                className="relative p-2 text-[var(--light)] hover:text-[var(--gold)] transition-colors"
-                aria-label="Panier"
-              >
-                <ShoppingBag size={22} />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[var(--gold)] text-[var(--dark)] text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
-                    {cartCount}
-                  </span>
-                )}
+            <div className="flex items-center gap-6">
+              <button onClick={toggleCart} className="relative p-1" aria-label="Panier">
+                <ShoppingBag size={18} strokeWidth={1.5} className={onHero ? 'text-white' : 'text-[var(--text-main)]'} />
+                <AnimatePresence>
+                  {cartCount > 0 && (
+                    <motion.span
+                      initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                      className="absolute -top-1 -right-1 w-4 h-4 text-[9px] font-medium flex items-center justify-center rounded-full bg-[var(--text-main)] text-white"
+                    >
+                      {cartCount}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </button>
-              <button
-                onClick={() => router.push('/admin')}
-                className="hidden md:block text-xs tracking-widest uppercase text-[var(--gray-3)] hover:text-[var(--gold)] transition-colors border border-[var(--gray-1)] hover:border-[var(--gold)] px-3 py-1.5 rounded"
-              >
+
+              <Link href="/admin" className={`hidden md:block text-[10px] tracking-[0.15em] uppercase font-medium transition-colors ${
+                onHero ? 'text-white/70 hover:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+              }`}>
                 Admin
-              </button>
+              </Link>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Mobile menu */}
-      <div
-        className={`fixed inset-0 z-40 md:hidden transition-all duration-300 ${
-          mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-        <div
-          className={`absolute top-0 left-0 bottom-0 w-72 bg-[var(--dark-2)] transition-transform duration-300 ${
-            mobileOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-        >
-          <div className="p-6 pt-20">
-            <p className="font-cormorant text-xs tracking-[0.4em] uppercase text-[var(--gold)] mb-8">Navigation</p>
-            <nav className="flex flex-col gap-6">
-              {links.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setMobileOpen(false)}
-                  className="text-xl font-light text-[var(--light)] hover:text-[var(--gold)] transition-colors"
-                >
-                  {l.label}
-                </Link>
-              ))}
-              <Link
-                href="/admin"
-                onClick={() => setMobileOpen(false)}
-                className="text-xl font-light text-[var(--gray-3)] hover:text-[var(--gold)] transition-colors"
-              >
-                Panel Admin
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </div>
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMobileOpen(false)} />
+            <motion.div className="fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-2xl flex flex-col" initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ type: 'tween', duration: 0.3 }}>
+              <div className="flex items-center justify-between px-8 py-8 border-b border-[var(--border-soft)]">
+                <span className="font-cormorant text-xl tracking-widest uppercase">Moudestar</span>
+                <button onClick={() => setMobileOpen(false)} className="text-[var(--text-muted)] hover:text-black"><X size={20} /></button>
+              </div>
+              <nav className="flex-1 flex flex-col p-4">
+                {[...links, { href: '/admin', label: 'Admin' }].map((l) => (
+                  <Link key={l.href} href={l.href} onClick={() => setMobileOpen(false)} className="px-4 py-4 text-sm font-medium tracking-wide border-b border-[var(--border-soft)] hover:bg-[var(--bg-alt)] transition-colors">
+                    {l.label}
+                  </Link>
+                ))}
+              </nav>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }

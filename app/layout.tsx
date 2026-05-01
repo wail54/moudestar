@@ -6,30 +6,25 @@ import { CartDrawer } from '@/components/CartDrawer';
 import { ToastProvider } from '@/components/Toast';
 import { StoreHydration } from '@/components/StoreHydration';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Moudestar — Boutique Mode Premium',
-  description: 'Découvrez la collection Moudestar. Mode premium, designs épurés et intemporels.',
-  openGraph: {
-    title: 'Moudestar — Boutique Mode Premium',
-    description: 'Découvrez la collection Moudestar.',
-    type: 'website',
-  },
+  title: 'Moudestar — Maison de Mode',
+  description: 'Collection Moudestar. Mode premium, minimaliste et intemporel.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={inter.variable} suppressHydrationWarning>
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Inter:wght@300;400;500;600&display=swap"
           rel="stylesheet"
         />
       </head>
-      <body className="bg-dark min-h-screen">
+      <body className={`${inter.className} min-h-screen bg-[var(--bg-main)] text-[var(--text-main)]`}>
         <ToastProvider>
           <StoreHydration />
           <Header />
