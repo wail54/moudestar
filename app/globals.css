@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --gold: #b8966e;
+    --gold-light: #d4b896;
+    --dark: #0a0a0a;
+    --dark-2: #141414;
+    --dark-3: #1e1e1e;
+    --gray-1: #2a2a2a;
+    --gray-2: #555555;
+    --gray-3: #888888;
+    --gray-4: #b0b0b0;
+    --light: #f5f4f2;
+    --white: #ffffff;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--dark);
+    color: var(--light);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * { box-sizing: border-box; }
+}
+
+@layer utilities {
+  .font-cormorant { font-family: 'Cormorant Garamond', Georgia, serif; }
+
+  .text-gold { color: var(--gold); }
+  .bg-gold { background-color: var(--gold); }
+  .border-gold { border-color: var(--gold); }
+
+  .bg-dark { background-color: var(--dark); }
+  .bg-dark-2 { background-color: var(--dark-2); }
+  .bg-dark-3 { background-color: var(--dark-3); }
+
+  .animate-fade-up {
+    animation: fadeUp 0.6s ease forwards;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease forwards;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .stagger-1 { animation-delay: 0.1s; opacity: 0; }
+  .stagger-2 { animation-delay: 0.25s; opacity: 0; }
+  .stagger-3 { animation-delay: 0.4s; opacity: 0; }
+  .stagger-4 { animation-delay: 0.55s; opacity: 0; }
+}
