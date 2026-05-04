@@ -22,8 +22,9 @@ export default function BoutiquePage() {
   useEffect(() => {
     fetch('/api/products')
       .then((r) => r.json())
-      .then((data: Product[]) => {
-        setProducts(data.map(toFrontendProduct));
+      .then((data: unknown) => {
+        if (!Array.isArray(data)) { setLoading(false); return; } // API error
+        setProducts((data as Product[]).map(toFrontendProduct));
         setLoading(false);
       })
       .catch((e) => {

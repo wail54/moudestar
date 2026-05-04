@@ -21,8 +21,9 @@ export default function HomePage() {
   useEffect(() => {
     fetch('/api/products')
       .then((r) => r.json())
-      .then((data: Product[]) => {
-        const frontProducts = data.map(toFrontendProduct);
+      .then((data: unknown) => {
+        if (!Array.isArray(data)) return; // API error — ne pas crasher
+        const frontProducts = (data as Product[]).map(toFrontendProduct);
         setFeatured(frontProducts.filter((p) => p.featured).slice(0, 4));
       })
       .catch(console.error);

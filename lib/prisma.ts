@@ -2,21 +2,28 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 /**
- * Singleton PrismaClient pour Next.js — Prisma 7 avec adapter pg.
- * Résistant à l'absence de DATABASE_URL (ex : build-time sans env vars).
+ * Singleton PrismaClient — Prisma 7 avec @prisma/adapter-pg.
+ *
+ * DATABASE_URL doit être défini dans les variables d'environnement Vercel.
+ * Sans cette variable, toutes les requêtes DB échoueront avec P1001.
  */
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
-    // En prod sans DATABASE_URL : retourner un client factice qui throw
-    // uniquement lors des vraies requêtes DB (pas au boot).
-    console.warn('[prisma] DATABASE_URL is not set — DB calls will fail');
+    console.error(
+      '[prisma] ❌ DATABASE_URL is not set! ' +
+      'Add it in Vercel → Settings → Environment Variables. ' +
+      'Value: postgresql://postgres.ftqnvoyjiuggsdlfdlnd:[password]@aws-1-eu-central-1.pooler.supabase.com:6543/postgres'
+    );
   }
 
+  // On utilise un placeholder valide si la variable est absente,
+  // pour éviter un crash au démarrage — l'erreur surviendra uniquement
+  // lors de la première requête DB (PrismaClientKnownRequestError P1001).
   const adapter = new PrismaPg({
-    connectionString: connectionString ?? 'postgresql://localhost:5432/placeholder',
+    connectionString: connectionString ?? 'postgresql://placeholder:placeholder@localhost:5432/placeholder',
   });
 
   return new PrismaClient({ adapter });
