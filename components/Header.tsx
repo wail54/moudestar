@@ -12,6 +12,7 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const cart = useStore((s) => s.cart);
   const toggleCart = useStore((s) => s.toggleCart);
   const pathname = usePathname();
@@ -25,17 +26,17 @@ export function Header() {
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  // Vérifier si l'utilisateur est admin
   useEffect(() => {
     const supabase = createClient();
-    if (!supabase) return; // env vars manquantes — auth désactivée
+    if (!supabase) return;
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       setIsAdmin(user?.user_metadata?.role === 'ADMIN');
+      setUserEmail(user?.email ?? null);
     });
-    // Écouter les changements de session
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAdmin(session?.user?.user_metadata?.role === 'ADMIN');
+      setUserEmail(session?.user?.email ?? null);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -119,8 +120,28 @@ export function Header() {
                 </>
               )}
 
-              {/* Lien connexion si pas admin */}
-              {!isAdmin && (
+              {/* Utilisateur connecté non-admin */}
+              {!isAdmin && userEmail && (
+                <div className="hidden md:flex items-center gap-3">
+                  <span className={`text-[10px] tracking-[0.12em] font-medium truncate max-w-[140px] ${
+                    onHero ? 'text-white/70' : 'text-[var(--text-muted)]'
+                  }`}>
+                    {userEmail}
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    title="Déconnexion"
+                    className={`flex items-center gap-1 text-[10px] tracking-widest uppercase font-medium transition-colors ${
+                      onHero ? 'text-white/60 hover:text-white' : 'text-[var(--text-muted)] hover:text-red-500'
+                    }`}
+                  >
+                    <LogOut size={13} />
+                  </button>
+                </div>
+              )}
+
+              {/* Lien connexion si pas connecté */}
+              {!isAdmin && !userEmail && (
                 <Link href="/login" className={`hidden md:block text-[10px] tracking-[0.15em] uppercase font-medium transition-colors ${
                   onHero ? 'text-white/70 hover:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                 }`}>

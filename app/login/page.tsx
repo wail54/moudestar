@@ -48,7 +48,6 @@ function AuthForm() {
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
-      // Afficher le vrai message Supabase pour diagnostiquer (ex: "Email not confirmed")
       if (authError.message.toLowerCase().includes('email not confirmed')) {
         setError('Veuillez confirmer votre email avant de vous connecter. Vérifiez votre boîte mail.');
       } else if (authError.message.toLowerCase().includes('invalid login credentials')) {
@@ -60,12 +59,21 @@ function AuthForm() {
       return;
     }
 
+    // Upsert le Profile en DB (gère les comptes créés avant la correction)
+    const token = data.session?.access_token;
+    if (token) {
+      await fetch('/api/auth/ensure-profile', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).catch(() => {}); // non bloquant
+    }
+
     const role = data.user?.user_metadata?.role;
     if (role === 'ADMIN') {
       router.replace(redirectTo);
     } else {
-      // Utilisateur non-admin — connecté mais redirigé vers l'accueil
-      router.replace('/');
+      // Utilisateur connecté → boutique (changement visible)
+      router.replace('/boutique');
     }
   };
 
