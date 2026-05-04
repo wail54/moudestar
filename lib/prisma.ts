@@ -2,14 +2,23 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 /**
- * Singleton PrismaClient pour Next.js.
- *
- * Prisma 7 (engine type "client") exige un driver adapter.
- * On utilise @prisma/adapter-pg avec la DATABASE_URL (Transaction Pooler).
+ * Singleton PrismaClient pour Next.js — Prisma 7 avec adapter pg.
+ * Résistant à l'absence de DATABASE_URL (ex : build-time sans env vars).
  */
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+  const connectionString = process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    // En prod sans DATABASE_URL : retourner un client factice qui throw
+    // uniquement lors des vraies requêtes DB (pas au boot).
+    console.warn('[prisma] DATABASE_URL is not set — DB calls will fail');
+  }
+
+  const adapter = new PrismaPg({
+    connectionString: connectionString ?? 'postgresql://localhost:5432/placeholder',
+  });
+
   return new PrismaClient({ adapter });
 }
 
