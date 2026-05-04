@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { motion, Variants } from 'framer-motion';
-import { useStore } from '@/store/useStore';
+import { Product, toFrontendProduct } from '@/store/useStore';
 import { ProductCard } from '@/components/ProductCard';
 
 const CATS = ['Tous', 'Vêtements', 'Accessoires', 'Chaussures'];
@@ -14,13 +14,22 @@ const fadeUp: Variants = {
 };
 
 export default function BoutiquePage() {
-  const [mounted, setMounted] = useState(false);
-  const products = useStore((s) => s.products);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState('Tous');
 
   useEffect(() => {
-    setMounted(true);
+    fetch('/api/products')
+      .then((r) => r.json())
+      .then((data: Product[]) => {
+        setProducts(data.map(toFrontendProduct));
+        setLoading(false);
+      })
+      .catch((e) => {
+        console.error(e);
+        setLoading(false);
+      });
   }, []);
 
   const filtered = useMemo(() => products.filter((p) => {
@@ -70,8 +79,12 @@ export default function BoutiquePage() {
         </div>
 
         {/* Grid */}
-        {!mounted ? (
-          <div className="py-32" />
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="aspect-[3/4] bg-[var(--bg-alt)] rounded-sm animate-pulse" />
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
           <div className="py-32 text-center bg-[var(--bg-alt)] rounded-sm">
             <p className="font-cormorant text-3xl mb-2">Aucun article trouvé</p>

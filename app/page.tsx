@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { useStore } from '@/store/useStore';
+import { Product, toFrontendProduct } from '@/store/useStore';
 import { ProductCard } from '@/components/ProductCard';
 
 const fadeUp = (delay = 0) => ({
@@ -15,8 +16,17 @@ const fadeUp = (delay = 0) => ({
 });
 
 export default function HomePage() {
-  const products = useStore((s) => s.products);
-  const featured = products.filter((p) => p.featured).slice(0, 4);
+  const [featured, setFeatured] = useState<Product[]>([]);
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then((r) => r.json())
+      .then((data: Product[]) => {
+        const frontProducts = data.map(toFrontendProduct);
+        setFeatured(frontProducts.filter((p) => p.featured).slice(0, 4));
+      })
+      .catch(console.error);
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -59,17 +69,25 @@ export default function HomePage() {
             </p>
           </motion.div>
           <motion.div {...fadeUp(0.1)} className="hidden md:block">
-            <Link href="/boutique" className="btn-outline">Voir tout</Link>
+            <Link href="/boutique" className="btn-outline">Voir tout <ArrowRight size={14} /></Link>
           </motion.div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
-          {featured.map((p, i) => (
-            <motion.div key={p.id} {...fadeUp(i * 0.1)}>
-              <ProductCard product={p} />
-            </motion.div>
-          ))}
-        </div>
+        {featured.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
+            {featured.map((p, i) => (
+              <motion.div key={p.id} {...fadeUp(i * 0.1)}>
+                <ProductCard product={p} />
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="aspect-[3/4] bg-[var(--bg-alt)] rounded-sm animate-pulse" />
+            ))}
+          </div>
+        )}
 
         <div className="mt-12 text-center md:hidden">
           <Link href="/boutique" className="btn-outline w-full">Voir toute la collection</Link>

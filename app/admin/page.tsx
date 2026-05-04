@@ -1,19 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard, Package, PlusCircle, ShoppingBag, 
+  LayoutDashboard, Package, PlusCircle, ShoppingBag,
   Trash2, Landmark, Store, Globe, AlertTriangle, ChevronDown, PenLine, X
 } from 'lucide-react';
-import { useStore, OrderStatus, Product } from '@/store/useStore';
+import { Product, toFrontendProduct } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
 import { CaisseSystem } from '@/components/CaisseSystem';
 
 type Tab = 'orders' | 'products' | 'add' | 'caisse';
+type OrderStatus = 'En attente' | 'Confirmée' | 'Expédiée' | 'Terminée';
 const STATUS_OPTIONS: OrderStatus[] = ['En attente', 'Confirmée', 'Expédiée', 'Terminée'];
+
+interface OrderItem {
+  id: string;
+  product: Product;
+  quantity: number;
+  size?: string;
+  price: number;
+}
+interface Order {
+  id: string;
+  date: string;
+  items: OrderItem[];
+  subtotal: number;
+  discount: number;
+  tva: number;
+  total: number;
+  status: string;
+  source: string;
+}
 
 const childFade = {
   hidden: { opacity: 0, y: 15 },
@@ -22,62 +42,95 @@ const childFade = {
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('orders');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-
-  const orders = useStore((s) => s.orders);
-  const products = useStore((s) => s.products);
-  const removeProduct = useStore((s) => s.removeProduct);
-  const addProduct = useStore((s) => s.addProduct);
-  const updateProduct = useStore((s) => s.updateProduct);
-  const updateOrderStatus = useStore((s) => s.updateOrderStatus);
-  const deleteOrder = useStore((s) => s.deleteOrder);
   const { showToast } = useToast();
 
-  const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
-
-  const [form, setForm] = useState({ 
+  const [form, setForm] = useState({
     name: '', description: '', price: '', image: '', category: 'Vêtements', featured: false,
     stockS: '0', stockM: '0', stockL: '0', stockXL: '0'
   });
 
-  const handleAdd = (e: React.FormEvent) => {
+  const loadProducts = useCallback(async () => {
+    const res = await fetch('/api/products');
+    const data: Product[] = await res.json();
+    setProducts(data.map(toFrontendProduct));
+  }, []);
+
+  const loadOrders = useCallback(async () => {
+    const res = await fetch('/api/orders');
+    const data: Order[] = await res.json();
+    setOrders(data);
+  }, []);
+
+  useEffect(() => { loadProducts(); loadOrders(); }, [loadProducts, loadOrders]);
+
+  const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
+
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.price) return;
-    addProduct({
-      name: form.name, description: form.description,
-      price: parseFloat(form.price),
-      image: form.image || '',
-      category: form.category, featured: form.featured,
-      stock: {
-        S: parseInt(form.stockS) || 0,
-        M: parseInt(form.stockM) || 0,
-        L: parseInt(form.stockL) || 0,
-        XL: parseInt(form.stockXL) || 0
-      }
+    const res = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name, description: form.description,
+        price: parseFloat(form.price), image: form.image || '',
+        category: form.category, featured: form.featured,
+        stock: { S: parseInt(form.stockS)||0, M: parseInt(form.stockM)||0, L: parseInt(form.stockL)||0, XL: parseInt(form.stockXL)||0 }
+      }),
     });
-    setForm({ name: '', description: '', price: '', image: '', category: 'Vêtements', featured: false, stockS: '0', stockM: '0', stockL: '0', stockXL: '0' });
-    showToast('Produit créé avec succès', 'success');
-    setTab('products');
+    if (res.ok) {
+      await loadProducts();
+      setForm({ name: '', description: '', price: '', image: '', category: 'Vêtements', featured: false, stockS: '0', stockM: '0', stockL: '0', stockXL: '0' });
+      showToast('Produit créé avec succès', 'success');
+      setTab('products');
+    }
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
-    updateProduct(editingProduct.id, {
-      name: editingProduct.name,
-      price: editingProduct.price,
-      stock: editingProduct.stock,
-      image: editingProduct.image
+    const res = await fetch(`/api/products/${editingProduct.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: editingProduct.name, price: editingProduct.price,
+        image: editingProduct.image, stock: editingProduct.stock,
+      }),
     });
-    setEditingProduct(null);
-    showToast('Produit mis à jour', 'success');
+    if (res.ok) {
+      await loadProducts();
+      setEditingProduct(null);
+      showToast('Produit mis à jour', 'success');
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+    if (res.ok) { await loadProducts(); showToast('Produit supprimé', 'success'); }
+  };
+
+  const handleDeleteOrder = async (id: string) => {
+    const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
+    if (res.ok) { await loadOrders(); setDeleteId(null); showToast('Commande supprimée', 'success'); }
+  };
+
+  const handleStatusChange = async (id: string, status: string) => {
+    await fetch(`/api/orders/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    await loadOrders();
   };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg-main)]">
-      
-      {/* ── Modals ── */}
+
+      {/* Modals */}
       <AnimatePresence>
         {deleteId && (
           <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -88,13 +141,12 @@ export default function AdminPage() {
               </div>
               <p className="text-sm text-[var(--text-muted)] mb-8">Voulez-vous vraiment supprimer cette commande ?</p>
               <div className="flex gap-4">
-                <button onClick={() => { deleteOrder(deleteId); setDeleteId(null); showToast('Commande supprimée', 'success'); }} className="flex-1 py-3 bg-red-600 text-white text-xs font-medium uppercase tracking-widest rounded-sm hover:bg-red-700">Supprimer</button>
+                <button onClick={() => handleDeleteOrder(deleteId)} className="flex-1 py-3 bg-red-600 text-white text-xs font-medium uppercase tracking-widest rounded-sm hover:bg-red-700">Supprimer</button>
                 <button onClick={() => setDeleteId(null)} className="flex-1 py-3 bg-[var(--bg-alt)] text-black text-xs font-medium uppercase tracking-widest rounded-sm hover:bg-gray-200">Annuler</button>
               </div>
             </motion.div>
           </motion.div>
         )}
-
         {editingProduct && (
           <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div className="bg-white p-8 max-w-md w-full mx-4 rounded-sm shadow-xl max-h-[90vh] overflow-y-auto" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
@@ -109,29 +161,28 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Prix (€)</label>
-                  <input type="number" step="0.01" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value) || 0})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
+                  <input type="number" step="0.01" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)||0})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
                 </div>
                 <div>
-                  <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">URL Image (laisser vide pour cacher)</label>
+                  <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">URL Image</label>
                   <input type="text" value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
                 </div>
-                <div>
-                  <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-3">Stocks par taille</label>
-                  <div className="grid grid-cols-4 gap-3">
-                    {['S', 'M', 'L', 'XL'].map(sz => (
-                      <div key={sz}>
-                        <label className="block text-xs font-medium mb-1 text-center">{sz}</label>
-                        <input type="number" min="0" value={editingProduct.stock ? editingProduct.stock[sz as keyof typeof editingProduct.stock] : 0} 
-                          onChange={e => setEditingProduct({
-                            ...editingProduct, 
-                            stock: { ...editingProduct.stock, [sz]: parseInt(e.target.value) || 0 } as NonNullable<Product['stock']>
-                          })} 
-                          className="w-full px-2 py-2 bg-[var(--bg-alt)] outline-none rounded-sm text-sm text-center border border-transparent focus:border-[var(--text-main)]" 
-                        />
-                      </div>
-                    ))}
+                {editingProduct.stock && (
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-3">Stocks par taille</label>
+                    <div className="grid grid-cols-4 gap-3">
+                      {(['S','M','L','XL'] as const).map(sz => (
+                        <div key={sz}>
+                          <label className="block text-xs font-medium mb-1 text-center">{sz}</label>
+                          <input type="number" min="0" value={editingProduct.stock![sz]}
+                            onChange={e => setEditingProduct({ ...editingProduct, stock: { ...editingProduct.stock!, [sz]: parseInt(e.target.value)||0 } })}
+                            className="w-full px-2 py-2 bg-[var(--bg-alt)] outline-none rounded-sm text-sm text-center border border-transparent focus:border-[var(--text-main)]"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
                 <button type="submit" className="mt-4 w-full py-4 bg-black text-white text-xs font-medium uppercase tracking-widest rounded-sm hover:bg-black/90">Sauvegarder</button>
               </form>
             </motion.div>
@@ -139,18 +190,15 @@ export default function AdminPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Sidebar / Topbar ── */}
+      {/* Sidebar */}
       <aside className="w-full md:w-64 flex flex-col md:border-r border-b border-[var(--border-soft)] bg-white md:sticky md:top-0 md:h-screen z-40">
         <div className="px-6 md:px-8 py-6 md:py-8 border-b border-[var(--border-soft)] flex items-center justify-between">
           <div>
-            <Link href="/" className="font-cormorant text-xl md:text-2xl font-light tracking-widest uppercase text-black hover:text-[var(--text-muted)] transition-colors">
-              Moudestar
-            </Link>
+            <Link href="/" className="font-cormorant text-xl md:text-2xl font-light tracking-widest uppercase text-black hover:text-[var(--text-muted)] transition-colors">Moudestar</Link>
             <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--text-muted)] mt-1 font-medium">Panel Admin</p>
           </div>
           <Link href="/" className="md:hidden text-[10px] uppercase tracking-widest border border-[var(--border-soft)] px-3 py-1 rounded-sm text-black hover:bg-[var(--bg-alt)]">Retour</Link>
         </div>
-
         <nav className="flex-1 p-4 md:py-6 flex md:flex-col gap-2 overflow-x-auto hide-scrollbar whitespace-nowrap">
           {[
             { id: 'orders', label: 'Commandes', icon: LayoutDashboard },
@@ -158,9 +206,7 @@ export default function AdminPage() {
             { id: 'add', label: 'Nouveau', icon: PlusCircle },
             { id: 'caisse', label: 'Caisse', icon: Landmark },
           ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setTab(item.id as Tab)}
+            <button key={item.id} onClick={() => setTab(item.id as Tab)}
               className={`flex items-center gap-3 px-4 py-3 md:py-4 text-[10px] md:text-[11px] font-medium tracking-widest uppercase rounded-sm transition-all ${
                 tab === item.id ? 'bg-black text-white' : 'text-[var(--text-muted)] hover:text-black hover:bg-[var(--bg-alt)] border border-transparent hover:border-[var(--border-soft)]'
               }`}
@@ -172,19 +218,17 @@ export default function AdminPage() {
         </nav>
       </aside>
 
-      {/* ── Content ── */}
+      {/* Content */}
       <div className="flex-1 overflow-x-hidden bg-[var(--bg-alt)]">
         <div className="max-w-6xl mx-auto p-4 md:p-10 lg:p-14">
           <AnimatePresence mode="wait">
-            
-            {/* ORDERS */}
+
             {tab === 'orders' && (
               <motion.div key="orders" variants={childFade} initial="hidden" animate="show">
                 <div className="mb-10">
                   <h1 className="font-cormorant text-5xl font-light mb-2">Dashboard</h1>
                   <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] font-medium">Vue d&apos;ensemble des ventes</p>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                   {[
                     { label: 'Commandes', val: orders.length },
@@ -197,7 +241,6 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
-
                 {orders.length === 0 ? (
                   <div className="py-24 text-center bg-white rounded-sm border border-[var(--border-soft)]">
                     <ShoppingBag size={32} className="mx-auto mb-4 text-[var(--text-muted)]" strokeWidth={1} />
@@ -210,7 +253,7 @@ export default function AdminPage() {
                         <div className="flex flex-wrap items-center justify-between pb-4 border-b border-[var(--border-soft)] mb-6 gap-4">
                           <div>
                             <p className="font-mono text-xs font-medium mb-1">#{order.id.slice(-8)}</p>
-                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest">{order.date}</p>
+                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest">{new Date(order.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="flex items-center gap-1.5 text-[9px] tracking-widest uppercase bg-[var(--bg-alt)] px-3 py-1.5 rounded-sm font-medium">
@@ -218,7 +261,7 @@ export default function AdminPage() {
                               {order.source}
                             </span>
                             <div className="relative">
-                              <select value={order.status} onChange={(e) => updateOrderStatus(order.id, e.target.value as OrderStatus)}
+                              <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value)}
                                 className="appearance-none pl-4 pr-8 py-1.5 text-[10px] font-medium tracking-widest uppercase bg-white border border-[var(--border-soft)] rounded-sm outline-none cursor-pointer hover:border-black transition-colors"
                               >
                                 {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
@@ -228,28 +271,24 @@ export default function AdminPage() {
                             <button onClick={() => setDeleteId(order.id)} className="text-[var(--text-muted)] hover:text-red-600 transition-colors p-2 bg-[var(--bg-alt)] rounded-sm"><Trash2 size={14} /></button>
                           </div>
                         </div>
-                        
                         <div className="flex flex-col gap-4">
                           {order.items.map((item, idx) => (
                             <div key={idx} className="flex gap-4 items-center">
-                              {item.product.image ? (
-                                <div className="relative w-12 h-16 bg-[var(--bg-alt)] rounded-xs overflow-hidden flex-shrink-0 flex items-center justify-center">
+                              {item.product?.image ? (
+                                <div className="relative w-12 h-16 bg-[var(--bg-alt)] rounded-xs overflow-hidden flex-shrink-0">
                                   <Image src={item.product.image} alt={item.product.name} fill className="object-cover" />
                                 </div>
                               ) : (
-                                <div className="w-12 h-16 bg-[var(--bg-alt)] border border-[var(--border-soft)] border-dashed rounded-xs flex items-center justify-center text-[8px] text-[var(--text-muted)] uppercase tracking-widest text-center flex-shrink-0">
-                                  Sans<br/>Image
-                                </div>
+                                <div className="w-12 h-16 bg-[var(--bg-alt)] border border-dashed border-[var(--border-soft)] rounded-xs flex items-center justify-center text-[8px] text-[var(--text-muted)] uppercase tracking-widest text-center flex-shrink-0">Sans<br/>Image</div>
                               )}
                               <div className="flex-1">
-                                <p className="text-sm font-medium">{item.product.name}</p>
+                                <p className="text-sm font-medium">{item.product?.name ?? 'Produit'}</p>
                                 <p className="text-[10px] text-[var(--text-muted)] font-medium uppercase tracking-widest mt-1">Qté: {item.quantity} {item.size && `• Taille: ${item.size}`}</p>
                               </div>
-                              <p className="font-medium text-sm">{(item.product.price * item.quantity).toFixed(2)} €</p>
+                              <p className="font-medium text-sm">{(item.price * item.quantity).toFixed(2)} €</p>
                             </div>
                           ))}
                         </div>
-
                         <div className="flex flex-col items-end gap-1 pt-6 mt-6 border-t border-[var(--border-soft)]">
                           {order.discount > 0 && <p className="text-xs font-medium text-red-500 uppercase tracking-widest">Remise: -{order.discount.toFixed(2)} €</p>}
                           <p className="font-cormorant text-2xl font-medium mt-1">Total: {order.total.toFixed(2)} €</p>
@@ -261,7 +300,6 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* PRODUCTS */}
             {tab === 'products' && (
               <motion.div key="products" variants={childFade} initial="hidden" animate="show">
                 <div className="flex items-end justify-between mb-10">
@@ -271,7 +309,6 @@ export default function AdminPage() {
                   </div>
                   <button onClick={() => setTab('add')} className="btn-primary"><PlusCircle size={14} /> Nouveau</button>
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {products.map((p) => {
                     const totalStock = p.stock ? Object.values(p.stock).reduce((a, b) => a + b, 0) : null;
@@ -295,7 +332,7 @@ export default function AdminPage() {
                           </div>
                           <div className="flex gap-2">
                             <button onClick={() => setEditingProduct(p)} className="p-2 bg-[var(--bg-alt)] text-[var(--text-muted)] hover:text-black rounded-sm transition-colors"><PenLine size={14}/></button>
-                            <button onClick={() => removeProduct(p.id)} className="p-2 bg-[var(--bg-alt)] text-[var(--text-muted)] hover:text-red-600 rounded-sm transition-colors"><Trash2 size={14}/></button>
+                            <button onClick={() => handleDeleteProduct(p.id)} className="p-2 bg-[var(--bg-alt)] text-[var(--text-muted)] hover:text-red-600 rounded-sm transition-colors"><Trash2 size={14}/></button>
                           </div>
                         </div>
                       </div>
@@ -305,12 +342,10 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* ADD PRODUCT */}
             {tab === 'add' && (
               <motion.div key="add" variants={childFade} initial="hidden" animate="show" className="max-w-2xl">
                 <h1 className="font-cormorant text-5xl font-light mb-2">Nouveau</h1>
                 <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] font-medium mb-10">Créer un produit</p>
-                
                 <form onSubmit={handleAdd} className="bg-white p-8 rounded-sm shadow-sm border border-[var(--border-soft)] flex flex-col gap-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="col-span-1 md:col-span-2">
@@ -336,25 +371,22 @@ export default function AdminPage() {
                       <input type="url" value={form.image} onChange={e => setForm({...form, image: e.target.value})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
                     </div>
                   </div>
-
                   <div className="pt-6 mt-2 border-t border-[var(--border-soft)]">
                     <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-4">Stocks par taille</label>
                     <div className="grid grid-cols-4 gap-4">
-                      {['S', 'M', 'L', 'XL'].map(sz => (
+                      {(['S','M','L','XL'] as const).map(sz => (
                         <div key={sz}>
                           <label className="block text-xs font-medium text-center mb-2">{sz}</label>
-                          <input type="number" min="0" value={(form as any)[`stock${sz}`]} onChange={e => setForm({...form, [`stock${sz}`]: e.target.value})} className="w-full px-2 py-2 bg-white outline-none rounded-sm text-sm text-center border border-[var(--border-soft)] focus:border-black transition-colors" />
+                          <input type="number" min="0" value={(form as Record<string, string|boolean>)[`stock${sz}`] as string} onChange={e => setForm({...form, [`stock${sz}`]: e.target.value})} className="w-full px-2 py-2 bg-white outline-none rounded-sm text-sm text-center border border-[var(--border-soft)] focus:border-black transition-colors" />
                         </div>
                       ))}
                     </div>
                   </div>
-
                   <button type="submit" className="btn-primary w-full mt-4">Créer le produit</button>
                 </form>
               </motion.div>
             )}
 
-            {/* CAISSE */}
             {tab === 'caisse' && (
               <motion.div key="caisse" variants={childFade} initial="hidden" animate="show">
                 <div className="mb-10">

@@ -10,19 +10,33 @@ export function CartDrawer() {
   const isOpen = useStore((s) => s.isCartOpen);
   const closeCart = useStore((s) => s.closeCart);
   const cart = useStore((s) => s.cart);
+  const clearCart = useStore((s) => s.clearCart);
   const removeFromCart = useStore((s) => s.removeFromCart);
   const updateQuantity = useStore((s) => s.updateQuantity);
-  const placeOrder = useStore((s) => s.placeOrder);
   const { showToast } = useToast();
+
+  const placeOrder = async () => {
+    if (!cart.length) return;
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: cart, discountAmount: 0, source: 'en_ligne' }),
+    });
+    if (res.ok) {
+      clearCart();
+      showToast('Commande validée avec succès', 'success');
+      closeCart();
+    } else {
+      showToast('Erreur lors de la commande', 'error');
+    }
+  };
 
   const subtotal = cart.reduce((s, i) => s + i.product.price * i.quantity, 0);
   const tva = subtotal * 0.2;
   const total = subtotal + tva;
 
   const handleCheckout = () => {
-    if (!cart.length) return;
     placeOrder();
-    showToast('Commande validée avec succès', 'success');
   };
 
   return (

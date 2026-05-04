@@ -2,18 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Menu, X } from 'lucide-react';
+import { ShoppingBag, Menu, X, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/store/useStore';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const cart = useStore((s) => s.cart);
   const toggleCart = useStore((s) => s.toggleCart);
   const pathname = usePathname();
-  const isAdmin = pathname?.startsWith('/admin');
+  const router = useRouter();
+  const isAdminRoute = pathname?.startsWith('/admin');
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
   useEffect(() => {
@@ -22,7 +25,27 @@ export function Header() {
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  if (isAdmin) return null;
+  // Vérifier si l'utilisateur est admin
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsAdmin(user?.user_metadata?.role === 'ADMIN');
+    });
+    // Écouter les changements de session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAdmin(session?.user?.user_metadata?.role === 'ADMIN');
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setIsAdmin(false);
+    router.push('/');
+  };
+
+  if (isAdminRoute) return null;
 
   const onHero = pathname === '/' && !scrolled;
 
@@ -39,19 +62,16 @@ export function Header() {
         <div className="max-w-screen-xl mx-auto px-6 md:px-10">
           <div className={`flex items-center justify-between transition-all duration-300 ${scrolled ? 'h-16' : 'h-24'}`}>
             
-            {/* Mobile Menu Toggle */}
             <button className="md:hidden" onClick={() => setMobileOpen(true)} aria-label="Menu">
               <Menu size={20} className={onHero ? 'text-white' : 'text-[var(--text-main)]'} />
             </button>
 
-            {/* Logo */}
             <Link href="/" className={`font-cormorant text-2xl md:text-3xl tracking-[0.25em] uppercase transition-colors ${
               onHero ? 'text-white hover:text-white/80' : 'text-[var(--text-main)] hover:text-[var(--text-muted)]'
             }`}>
               Moudestar
             </Link>
 
-            {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-10">
               {links.map((l) => (
                 <Link key={l.href} href={l.href} className={`text-[11px] tracking-[0.15em] uppercase font-medium transition-colors ${
@@ -62,8 +82,7 @@ export function Header() {
               ))}
             </nav>
 
-            {/* Actions */}
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-5">
               <button onClick={toggleCart} className="relative p-1" aria-label="Panier">
                 <ShoppingBag size={18} strokeWidth={1.5} className={onHero ? 'text-white' : 'text-[var(--text-main)]'} />
                 <AnimatePresence>
@@ -78,11 +97,34 @@ export function Header() {
                 </AnimatePresence>
               </button>
 
-              <Link href="/admin" className={`hidden md:block text-[10px] tracking-[0.15em] uppercase font-medium transition-colors ${
-                onHero ? 'text-white/70 hover:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-              }`}>
-                Admin
-              </Link>
+              {/* Lien Admin — visible seulement si connecté en admin */}
+              {isAdmin && (
+                <>
+                  <Link href="/admin" className={`hidden md:block text-[10px] tracking-[0.15em] uppercase font-medium transition-colors ${
+                    onHero ? 'text-white/70 hover:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                  }`}>
+                    Admin
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    title="Déconnexion"
+                    className={`hidden md:flex items-center gap-1.5 text-[10px] tracking-[0.15em] uppercase font-medium transition-colors ${
+                      onHero ? 'text-white/60 hover:text-white' : 'text-[var(--text-muted)] hover:text-red-500'
+                    }`}
+                  >
+                    <LogOut size={14} />
+                  </button>
+                </>
+              )}
+
+              {/* Lien connexion si pas admin */}
+              {!isAdmin && (
+                <Link href="/login" className={`hidden md:block text-[10px] tracking-[0.15em] uppercase font-medium transition-colors ${
+                  onHero ? 'text-white/70 hover:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}>
+                  Connexion
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -99,11 +141,19 @@ export function Header() {
                 <button onClick={() => setMobileOpen(false)} className="text-[var(--text-muted)] hover:text-black"><X size={20} /></button>
               </div>
               <nav className="flex-1 flex flex-col p-4">
-                {[...links, { href: '/admin', label: 'Admin' }].map((l) => (
+                {[
+                  ...links,
+                  ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : [{ href: '/login', label: 'Connexion' }])
+                ].map((l) => (
                   <Link key={l.href} href={l.href} onClick={() => setMobileOpen(false)} className="px-4 py-4 text-sm font-medium tracking-wide border-b border-[var(--border-soft)] hover:bg-[var(--bg-alt)] transition-colors">
                     {l.label}
                   </Link>
                 ))}
+                {isAdmin && (
+                  <button onClick={() => { handleLogout(); setMobileOpen(false); }} className="px-4 py-4 text-sm font-medium tracking-wide text-left text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2">
+                    <LogOut size={14} /> Déconnexion
+                  </button>
+                )}
               </nav>
             </motion.div>
           </>

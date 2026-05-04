@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Produits ─────────────────────────────────────────────────────────────────
+
+model Product {
+  id          String      @id @default(cuid())
+  name        String
+  description String      @default("")
+  price       Float
+  image       String      @default("")
+  category    String
+  featured    Boolean     @default(false)
+  stockS      Int         @default(0)
+  stockM      Int         @default(0)
+  stockL      Int         @default(0)
+  stockXL     Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+}
+
+// ─── Commandes ────────────────────────────────────────────────────────────────
+
+model Order {
+  id        String      @id @default(cuid())
+  date      DateTime    @default(now())
+  subtotal  Float
+  discount  Float       @default(0)
+  tva       Float
+  total     Float
+  status    String      @default("En attente")
+  source    String      @default("en_ligne")
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  size      String?
+  price     Float
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+}
+
+// ─── Utilisateurs & Rôles ────────────────────────────────────────────────────
+// Lié à auth.users de Supabase via l'UUID de l'utilisateur.
+// La table auth.users est gérée par Supabase, ce modèle stocke les données
+// supplémentaires (rôle, préférences, etc.).
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Profile {
+  id        String   @id                  // = auth.users.id (UUID Supabase)
+  email     String   @unique
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

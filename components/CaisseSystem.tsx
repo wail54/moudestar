@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Minus, Trash2, ShoppingCart, X, Tag, PenLine, Send } from 'lucide-react';
-import { CartItem, Product, Size, useStore } from '@/store/useStore';
+import { CartItem, Product, Size, toFrontendProduct } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
 
 const TVA = 0.20;
@@ -12,9 +12,15 @@ type DiscountType = 'pct' | 'fixed';
 interface FreeItem { id: string; name: string; price: number; }
 
 export function CaisseSystem() {
-  const products = useStore((s) => s.products);
-  const placePosOrder = useStore((s) => s.placePosOrder);
+  const [products, setProducts] = useState<Product[]>([]);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then((r) => r.json())
+      .then((data: Product[]) => setProducts(data.map(toFrontendProduct)))
+      .catch(console.error);
+  }, []);
 
   const [query, setQuery] = useState('');
   const [posCart, setPosCart] = useState<CartItem[]>([]);
@@ -85,12 +91,28 @@ export function CaisseSystem() {
     setShowPayment(true);
   };
 
-  const confirmPayment = () => {
+  const confirmPayment = async () => {
     const freeCartItems: CartItem[] = freeItems.map((fi) => ({
-      product: { id: fi.id, name: fi.name, price: fi.price, description: '', image: '', category: 'Libre' }, quantity: 1
+      product: { id: fi.id, name: fi.name, price: fi.price, description: '', image: '', category: 'Libre', featured: false, stockS: 0, stockM: 0, stockL: 0, stockXL: 0 }, quantity: 1
     }));
-    placePosOrder([...posCart, ...freeCartItems], discountAmt);
-    
+
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [...posCart, ...freeCartItems],
+          discountAmount: discountAmt,
+          source: 'caisse',
+        }),
+      });
+      if (!res.ok) throw new Error('Erreur API');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur lors de la sauvegarde', 'error');
+      return;
+    }
+
     if (email) showToast(`Ticket envoyé à ${email}`, 'success');
     
     setShowPayment(false);

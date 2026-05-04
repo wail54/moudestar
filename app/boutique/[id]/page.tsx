@@ -5,27 +5,35 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ShoppingBag } from 'lucide-react';
-import { useStore, Size } from '@/store/useStore';
+import { useStore, Size, Product, toFrontendProduct } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
 
 const SIZES: Size[] = ['S', 'M', 'L', 'XL'];
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const [mounted, setMounted] = useState(false);
-  const products = useStore((s) => s.products);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
   const addToCart = useStore((s) => s.addToCart);
   const { showToast } = useToast();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const product = products.find((p) => p.id === resolvedParams.id);
-
   const [selectedSize, setSelectedSize] = useState<Size | null>(null);
 
-  if (!mounted) return <div className="min-h-screen bg-[var(--bg-main)]" />;
+  useEffect(() => {
+    fetch('/api/products')
+      .then((r) => r.json())
+      .then((data: Product[]) => {
+        const found = data.find((p) => p.id === resolvedParams.id);
+        setProduct(found ? toFrontendProduct(found) : null);
+        setLoading(false);
+      })
+      .catch((e) => {
+        console.error(e);
+        setLoading(false);
+      });
+  }, [resolvedParams.id]);
+
+  if (loading) return <div className="min-h-screen bg-[var(--bg-main)]" />;
+
   if (!product) return (
     <div className="min-h-screen pt-32 pb-32 flex flex-col items-center text-center">
       <h1 className="font-cormorant text-4xl mb-4">Produit introuvable</h1>
@@ -33,10 +41,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     </div>
   );
 
-  const hasSizes = !!product.stock;
+  const hasSizes = product.stock
+    ? Object.values(product.stock).some((v) => v > 0)
+    : false;
   const stockForSize = (size: Size): number => product.stock ? product.stock[size] : 0;
+  const hasStockField = !!product.stock;
   
-  const isAvailable = hasSizes ? selectedSize !== null && stockForSize(selectedSize) > 0 : true;
+  const isAvailable = hasStockField ? selectedSize !== null && stockForSize(selectedSize) > 0 : true;
   const totalStock = product.stock ? Object.values(product.stock).reduce((a, b) => a + b, 0) : null;
   const isOutOfStock = totalStock !== null && totalStock === 0;
 
@@ -85,7 +96,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {product.description}
             </div>
 
-            {hasSizes && (
+            {hasStockField && (
               <div className="mb-10">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-xs font-medium uppercase tracking-widest">Tailles</p>
@@ -115,7 +126,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     );
                   })}
                 </div>
-                {hasSizes && !selectedSize && !isOutOfStock && (
+                {hasStockField && !selectedSize && !isOutOfStock && hasSizes && (
                   <p className="text-[10px] text-red-500 uppercase tracking-widest mt-4">Veuillez choisir une taille</p>
                 )}
               </div>
@@ -123,7 +134,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
             <button
               onClick={handleAdd}
-              disabled={isOutOfStock || (hasSizes && !selectedSize)}
+              disabled={isOutOfStock || (hasStockField && !selectedSize)}
               className="btn-primary w-full py-5 text-sm rounded-sm mt-auto"
             >
               <ShoppingBag size={16} />
