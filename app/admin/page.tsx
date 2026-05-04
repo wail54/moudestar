@@ -91,6 +91,9 @@ export default function AdminPage() {
       setForm({ name: '', description: '', price: '', image: '', category: 'Vêtements', featured: false, stockS: '0', stockM: '0', stockL: '0', stockXL: '0' });
       showToast('Produit créé avec succès', 'success');
       setTab('products');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Erreur lors de la création du produit', 'error');
     }
   };
 
