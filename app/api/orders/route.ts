@@ -96,6 +96,6 @@ export async function POST(req: Request) {
     return NextResponse.json(order, { status: 201 });
   } catch (error) {
     console.error('[POST /api/orders]', error);
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+    return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }

@@ -27,7 +27,8 @@ export function CartDrawer() {
       showToast('Commande validée avec succès', 'success');
       closeCart();
     } else {
-      showToast('Erreur lors de la commande', 'error');
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Erreur lors de la commande', 'error');
     }
   };
 

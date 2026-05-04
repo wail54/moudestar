@@ -106,10 +106,13 @@ export function CaisseSystem() {
           source: 'caisse',
         }),
       });
-      if (!res.ok) throw new Error('Erreur API');
-    } catch (e) {
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Erreur API');
+      }
+    } catch (e: any) {
       console.error(e);
-      showToast('Erreur lors de la sauvegarde', 'error');
+      showToast(e.message || 'Erreur lors de la sauvegarde', 'error');
       return;
     }
 
