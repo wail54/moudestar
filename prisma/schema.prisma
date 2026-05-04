@@ -2,6 +2,7 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Prisma 7 : url/directUrl sont définis dans prisma.config.ts, pas ici.
 datasource db {
   provider = "postgresql"
 }
@@ -50,10 +51,7 @@ model OrderItem {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
 }
 
-// ─── Utilisateurs & Rôles ────────────────────────────────────────────────────
-// Lié à auth.users de Supabase via l'UUID de l'utilisateur.
-// La table auth.users est gérée par Supabase, ce modèle stocke les données
-// supplémentaires (rôle, préférences, etc.).
+// ─── Utilisateurs & Rôles ─────────────────────────────────────────────────────
 
 enum Role {
   USER
@@ -61,7 +59,7 @@ enum Role {
 }
 
 model Profile {
-  id        String   @id                  // = auth.users.id (UUID Supabase)
+  id        String   @id
   email     String   @unique
   role      Role     @default(USER)
   createdAt DateTime @default(now())
