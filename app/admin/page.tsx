@@ -55,14 +55,18 @@ export default function AdminPage() {
 
   const loadProducts = useCallback(async () => {
     const res = await fetch('/api/products');
-    const data: Product[] = await res.json();
-    setProducts(data.map(toFrontendProduct));
+    const data: unknown = await res.json();
+    if (Array.isArray(data)) {
+      setProducts((data as Product[]).map(toFrontendProduct));
+    }
   }, []);
 
   const loadOrders = useCallback(async () => {
     const res = await fetch('/api/orders');
-    const data: Order[] = await res.json();
-    setOrders(data);
+    const data: unknown = await res.json();
+    if (Array.isArray(data)) {
+      setOrders(data as Order[]);
+    }
   }, []);
 
   useEffect(() => { loadProducts(); loadOrders(); }, [loadProducts, loadOrders]);
