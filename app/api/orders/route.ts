@@ -1,14 +1,27 @@
 import { NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 import { prisma } from '@/lib/prisma';
 
-// GET /api/orders — liste toutes les commandes avec leurs items
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+  return createServerClient(url, key, { cookies: { getAll: () => [], setAll: () => {} } });
+}
+
+async function getUserIdFromRequest(req: Request): Promise<string | null> {
+  const auth = req.headers.get('Authorization');
+  const token = auth?.replace('Bearer ', '');
+  if (!token) return null;
+  const { data: { user } } = await getSupabase().auth.getUser(token);
+  return user?.id ?? null;
+}
+
 export async function GET() {
   try {
     const orders = await prisma.order.findMany({
       include: {
-        items: {
-          include: { product: true },
-        },
+        items: { include: { product: true } },
+        profile: { select: { email: true, role: true } },
       },
       orderBy: { date: 'desc' },
     });
@@ -30,6 +43,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Panier vide' }, { status: 400 });
     }
 
+    // Récupérer l'utilisateur connecté si présent
+    const userId = await getUserIdFromRequest(req);
+
     const TVA_RATE = 0.20;
     const subtotal: number = items.reduce(
       (sum: number, i: { product: { price: number }; quantity: number }) =>
@@ -43,6 +59,7 @@ export async function POST(req: Request) {
     // Créer la commande et ses items en une seule transaction
     const order = await prisma.order.create({
       data: {
+        userId: userId ?? undefined,
         subtotal,
         discount: discountAmount,
         tva,
