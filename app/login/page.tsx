@@ -48,7 +48,14 @@ function AuthForm() {
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
-      setError('Email ou mot de passe incorrect.');
+      // Afficher le vrai message Supabase pour diagnostiquer (ex: "Email not confirmed")
+      if (authError.message.toLowerCase().includes('email not confirmed')) {
+        setError('Veuillez confirmer votre email avant de vous connecter. Vérifiez votre boîte mail.');
+      } else if (authError.message.toLowerCase().includes('invalid login credentials')) {
+        setError('Email ou mot de passe incorrect.');
+      } else {
+        setError(authError.message);
+      }
       setLoading(false);
       return;
     }
@@ -78,23 +85,25 @@ function AuthForm() {
 
     setLoading(true);
 
-    const supabase = createClient();
-    if (!supabase) {
-      setError('Service Supabase non configuré. Vérifiez les variables d\'environnement.');
-      setLoading(false);
-      return;
-    }
-
-    const { error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { role: 'USER' } },
-    });
-
-    if (authError) {
-      setError(authError.message.includes('already registered')
-        ? 'Cet email est déjà utilisé. Connectez-vous.'
-        : 'Erreur lors de la création du compte.');
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        const msg: string = result.error ?? 'Erreur lors de la création du compte.';
+        setError(
+          msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already been registered')
+            ? 'Cet email est déjà utilisé. Connectez-vous.'
+            : msg
+        );
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError('Erreur réseau. Réessayez.');
       setLoading(false);
       return;
     }
