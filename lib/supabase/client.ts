@@ -1,18 +1,14 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+// Clés publiques Supabase — sûres à embarquer dans le bundle client
+// (le "publishable key" est conçu pour être exposé dans le code front-end)
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://ftqnvoyjiuggsdlfdlnd.supabase.co";
 
-/**
- * Crée un client Supabase côté navigateur.
- * Retourne null si les variables d'environnement sont absentes
- * (évite le crash au runtime si NEXT_PUBLIC_* ne sont pas set au build).
- */
-export const createClient = () => {
-  if (!supabaseUrl || !supabaseKey) {
-    // Env vars absentes — pas de crash, les features auth seront désactivées
-    console.warn("[supabase/client] Missing env vars — auth disabled");
-    return null;
-  }
-  return createBrowserClient(supabaseUrl, supabaseKey);
-};
+const supabaseKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  "sb_publishable_FT0NilA3bX8g1kfeoAOd2A_2bKoP05E";
+
+export const createClient = () =>
+  createBrowserClient(supabaseUrl, supabaseKey);
