@@ -28,6 +28,8 @@ export function Header() {
   // Vérifier si l'utilisateur est admin
   useEffect(() => {
     const supabase = createClient();
+    if (!supabase) return; // env vars manquantes — auth désactivée
+
     supabase.auth.getUser().then(({ data: { user } }) => {
       setIsAdmin(user?.user_metadata?.role === 'ADMIN');
     });
@@ -40,7 +42,7 @@ export function Header() {
 
   const handleLogout = async () => {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    if (supabase) await supabase.auth.signOut();
     setIsAdmin(false);
     router.push('/');
   };

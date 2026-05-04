@@ -23,6 +23,7 @@ function LoginForm() {
   // Redirect if already logged in as admin
   useEffect(() => {
     const supabase = createClient();
+    if (!supabase) return;
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user?.user_metadata?.role === 'ADMIN') {
         router.replace(redirectTo);
@@ -36,6 +37,12 @@ function LoginForm() {
     setLoading(true);
 
     const supabase = createClient();
+    if (!supabase) {
+      setError('Service indisponible. Contactez l’administrateur.');
+      setLoading(false);
+      return;
+    }
+
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
