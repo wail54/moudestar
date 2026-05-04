@@ -32,9 +32,30 @@ export default function GlobalError({
           <h1 style={{ fontSize: '2rem', fontWeight: 300, marginBottom: '1rem', color: '#111' }}>
             Une erreur est survenue
           </h1>
-          <p style={{ color: '#6b7280', marginBottom: '2rem', maxWidth: '400px' }}>
-            Le service est temporairement indisponible. Veuillez réessayer dans quelques instants.
-          </p>
+
+          {/* Affiche l'erreur réelle — pour debugging */}
+          <div style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '4px',
+            padding: '1rem 1.5rem',
+            marginBottom: '1.5rem',
+            maxWidth: '600px',
+            textAlign: 'left',
+          }}>
+            <p style={{ color: '#991b1b', fontWeight: 600, fontSize: '12px', marginBottom: '0.5rem' }}>
+              Détail de l&apos;erreur :
+            </p>
+            <code style={{ color: '#b91c1c', fontSize: '11px', wordBreak: 'break-all', display: 'block' }}>
+              {error?.message || 'Unknown error'}
+            </code>
+            {error?.digest && (
+              <code style={{ color: '#6b7280', fontSize: '10px', display: 'block', marginTop: '0.5rem' }}>
+                Digest: {error.digest}
+              </code>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button
               onClick={reset}

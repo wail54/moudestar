@@ -89,7 +89,7 @@ export const useStore = create<CartStore>()(
       toggleCart: () => set((state) => ({ isCartOpen: !state.isCartOpen })),
       closeCart: () => set({ isCartOpen: false }),
     }),
-    { name: 'moudestar-cart-v1', skipHydration: true }
+    { name: 'moudestar-cart-v1' }
   )
 );
 
