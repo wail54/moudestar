@@ -3,16 +3,21 @@ import { prisma } from '@/lib/prisma';
 
 type Params = { params: Promise<{ id: string }> };
 
-// PATCH /api/orders/[id] — mettre à jour le statut d'une commande
+// PATCH /api/orders/[id] — mettre à jour statut, numéro de suivi, notes
 export async function PATCH(req: Request, { params }: Params) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const { status } = body;
+    const { status, trackingNumber, notes } = body;
+
+    const data: any = {};
+    if (status !== undefined) data.status = status;
+    if (trackingNumber !== undefined) data.trackingNumber = trackingNumber;
+    if (notes !== undefined) data.notes = notes;
 
     const order = await prisma.order.update({
       where: { id },
-      data: { status },
+      data,
     });
 
     return NextResponse.json(order);

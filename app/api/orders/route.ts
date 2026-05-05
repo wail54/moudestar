@@ -56,15 +56,17 @@ export async function POST(req: Request) {
         let nameInfo = session.shipping_details?.name || session.customer_details?.name || session.customer_details?.email || '';
 
         if (!finalShippingAddress && addrInfo) {
+          const cityLine = [addrInfo.postal_code, addrInfo.city].filter(Boolean).join(' ');
           finalShippingAddress = [
             nameInfo,
             addrInfo.line1,
             addrInfo.line2,
-            `${addrInfo.postal_code} ${addrInfo.city}`,
-            addrInfo.country
-          ].filter(Boolean).join(', ');
+            cityLine,
+            addrInfo.country,
+          ].filter((v) => v && v.trim() && v !== 'null').join(', ');
         }
         
+
         if (session.metadata?.storeCreditCode) {
           finalStoreCreditCode = session.metadata.storeCreditCode;
         }

@@ -23,6 +23,7 @@ interface OrderItem {
   size?: string;
   color?: string;
   price: number;
+  refunded?: boolean;
 }
 interface Order {
   id: string;
@@ -34,7 +35,11 @@ interface Order {
   total: number;
   status: string;
   source: string;
+  paymentMethod?: string;
   shippingAddress?: string;
+  trackingNumber?: string;
+  refundStatus?: string | null;
+  creditCode?: string | null;
   profile?: { email: string; role: string };
 }
 
@@ -53,6 +58,14 @@ export default function AdminPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const { showToast } = useToast();
+
+  // Tracking number state: { [orderId]: value }
+  const [trackingInputs, setTrackingInputs] = useState<Record<string, string>>({});
+  // Refund: selected item IDs per order
+  const [refundSelections, setRefundSelections] = useState<Record<string, string[]>>({});
+  const [refundLoading, setRefundLoading] = useState<string | null>(null);
+  // Filter
+  const [orderFilter, setOrderFilter] = useState<'all' | 'voucher'>('all');
 
   const [form, setForm] = useState<{
     name: string; description: string; price: string; images: string[]; category: string;
@@ -179,6 +192,57 @@ export default function AdminPage() {
       body: JSON.stringify({ status }),
     });
     await loadOrders();
+  };
+
+  const handleSaveTracking = async (orderId: string) => {
+    const trackingNumber = trackingInputs[orderId] ?? '';
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackingNumber }),
+    });
+    if (res.ok) {
+      showToast('Numéro de suivi enregistré', 'success');
+      await loadOrders();
+    } else {
+      showToast('Erreur lors de la sauvegarde', 'error');
+    }
+  };
+
+  const toggleRefundItem = (orderId: string, itemId: string) => {
+    setRefundSelections(prev => {
+      const current = prev[orderId] || [];
+      const updated = current.includes(itemId)
+        ? current.filter(id => id !== itemId)
+        : [...current, itemId];
+      return { ...prev, [orderId]: updated };
+    });
+  };
+
+  const handleRefund = async (orderId: string) => {
+    const itemIds = refundSelections[orderId] || [];
+    if (itemIds.length === 0) { showToast('Sélectionnez au moins un article', 'error'); return; }
+    setRefundLoading(orderId);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemIds }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const msg = data.storeCreditCode
+          ? `Remboursé ${data.refundAmount.toFixed(2)} € — Avoir: ${data.storeCreditCode}`
+          : `Remboursé ${data.refundAmount.toFixed(2)} €`;
+        showToast(msg, 'success');
+        setRefundSelections(prev => ({ ...prev, [orderId]: [] }));
+        await loadOrders();
+      } else {
+        showToast(data.error || 'Erreur remboursement', 'error');
+      }
+    } finally {
+      setRefundLoading(null);
+    }
   };
 
   return (
@@ -314,7 +378,7 @@ export default function AdminPage() {
                   <h1 className="font-cormorant text-5xl font-light mb-2">Dashboard</h1>
                   <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] font-medium">Vue d&apos;ensemble des ventes</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   {[
                     { label: 'Commandes', val: orders.length },
                     { label: 'Produits Actifs', val: products.length },
@@ -326,71 +390,139 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
-                {orders.length === 0 ? (
-                  <div className="py-24 text-center bg-white rounded-sm border border-[var(--border-soft)]">
-                    <ShoppingBag size={32} className="mx-auto mb-4 text-[var(--text-muted)]" strokeWidth={1} />
-                    <p className="font-cormorant text-2xl font-light">Aucune commande pour le moment</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-6">
-                    {orders.map((order) => (
-                      <div key={order.id} className="bg-white rounded-sm shadow-sm border border-[var(--border-soft)] p-6">
-                        <div className="flex flex-wrap items-center justify-between pb-4 border-b border-[var(--border-soft)] mb-6 gap-4">
-                          <div>
-                            <p className="font-mono text-xs font-medium mb-1">#{order.id.slice(-8)}</p>
-                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest mb-1">{new Date(order.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
-                            {order.profile?.email && (
-                              <p className="text-[10px] text-blue-600 uppercase tracking-widest">{order.profile.email}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="flex items-center gap-1.5 text-[9px] tracking-widest uppercase bg-[var(--bg-alt)] px-3 py-1.5 rounded-sm font-medium">
-                              {order.source === 'caisse' ? <Store size={12}/> : <Globe size={12}/>}
-                              {order.source}
-                            </span>
-                            <div className="relative">
-                              <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                                className="appearance-none pl-4 pr-8 py-1.5 text-[10px] font-medium tracking-widest uppercase bg-white border border-[var(--border-soft)] rounded-sm outline-none cursor-pointer hover:border-black transition-colors"
-                              >
-                                {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                              </select>
-                              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-muted)]" />
-                            </div>
-                            <button onClick={() => setDeleteId(order.id)} className="text-[var(--text-muted)] hover:text-red-600 transition-colors p-2 bg-[var(--bg-alt)] rounded-sm"><Trash2 size={14} /></button>
-                          </div>
-                        </div>
-                        {order.shippingAddress && (
-                          <div className="mb-6 p-4 bg-[var(--bg-alt)] rounded-sm border border-[var(--border-soft)]">
-                            <p className="text-[10px] uppercase tracking-widest font-medium text-[var(--text-muted)] mb-2">Adresse de livraison</p>
-                            <p className="text-sm">{order.shippingAddress}</p>
-                          </div>
-                        )}
-                        <div className="flex flex-col gap-4">
-                          {order.items.map((item, idx) => (
-                            <div key={idx} className="flex gap-4 items-center">
-                              {item.product?.image ? (
-                                <div className="relative w-12 h-16 bg-[var(--bg-alt)] rounded-xs overflow-hidden flex-shrink-0">
-                                  <Image src={item.product.image} alt={item.product.name} fill className="object-cover" />
-                                </div>
-                              ) : (
-                                <div className="w-12 h-16 bg-[var(--bg-alt)] border border-dashed border-[var(--border-soft)] rounded-xs flex items-center justify-center text-[8px] text-[var(--text-muted)] uppercase tracking-widest text-center flex-shrink-0">Sans<br/>Image</div>
-                              )}
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">{item.product?.name ?? 'Produit'}</p>
-                                <p className="text-[10px] text-[var(--text-muted)] font-medium uppercase tracking-widest mt-1">Qté: {item.quantity} {item.size && `• Taille: ${item.size}`}</p>
+
+                {/* Filter bar */}
+                <div className="flex gap-2 mb-6">
+                  <button onClick={() => setOrderFilter('all')} className={`px-4 py-2 text-[10px] font-medium uppercase tracking-widest rounded-sm border transition-colors ${orderFilter === 'all' ? 'bg-black text-white border-black' : 'bg-white border-[var(--border-soft)] hover:border-black'}`}>Toutes</button>
+                  <button onClick={() => setOrderFilter('voucher')} className={`px-4 py-2 text-[10px] font-medium uppercase tracking-widest rounded-sm border transition-colors ${orderFilter === 'voucher' ? 'bg-black text-white border-black' : 'bg-white border-[var(--border-soft)] hover:border-black'}`}>Client en compte</button>
+                </div>
+
+                {(() => {
+                  const filtered = orderFilter === 'voucher'
+                    ? orders.filter(o => o.paymentMethod === 'VOUCHER' || o.creditCode)
+                    : orders;
+                  return filtered.length === 0 ? (
+                    <div className="py-24 text-center bg-white rounded-sm border border-[var(--border-soft)]">
+                      <ShoppingBag size={32} className="mx-auto mb-4 text-[var(--text-muted)]" strokeWidth={1} />
+                      <p className="font-cormorant text-2xl font-light">Aucune commande pour le moment</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-6">
+                      {filtered.map((order) => {
+                        const selectedItems = refundSelections[order.id] || [];
+                        const trackingVal = trackingInputs[order.id] ?? (order.trackingNumber || '');
+                        return (
+                          <div key={order.id} className="bg-white rounded-sm shadow-sm border border-[var(--border-soft)] p-6">
+                            {/* Header */}
+                            <div className="flex flex-wrap items-center justify-between pb-4 border-b border-[var(--border-soft)] mb-6 gap-4">
+                              <div>
+                                <p className="font-mono text-xs font-medium mb-1">#{order.id.slice(-8)}</p>
+                                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest mb-1">{new Date(order.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
+                                {order.profile?.email && <p className="text-[10px] text-blue-600 uppercase tracking-widest">{order.profile.email}</p>}
+                                {order.refundStatus && <span className="text-[9px] font-medium uppercase tracking-widest px-2 py-0.5 rounded-xs bg-orange-100 text-orange-600">{order.refundStatus === 'full' ? 'Remboursé' : 'Remb. partiel'}</span>}
                               </div>
-                              <p className="font-medium text-sm">{(item.price * item.quantity).toFixed(2)} €</p>
+                              <div className="flex items-center gap-3">
+                                <span className="flex items-center gap-1.5 text-[9px] tracking-widest uppercase bg-[var(--bg-alt)] px-3 py-1.5 rounded-sm font-medium">
+                                  {order.source === 'caisse' ? <Store size={12}/> : <Globe size={12}/>}
+                                  {order.source}
+                                </span>
+                                {order.paymentMethod && order.paymentMethod !== 'stripe' && (
+                                  <span className="text-[9px] font-medium uppercase tracking-widest px-2 py-1 rounded-xs bg-purple-100 text-purple-700">{order.paymentMethod}</span>
+                                )}
+                                <div className="relative">
+                                  <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                                    className="appearance-none pl-4 pr-8 py-1.5 text-[10px] font-medium tracking-widest uppercase bg-white border border-[var(--border-soft)] rounded-sm outline-none cursor-pointer hover:border-black transition-colors"
+                                  >
+                                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+                                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-muted)]" />
+                                </div>
+                                <button onClick={() => setDeleteId(order.id)} className="text-[var(--text-muted)] hover:text-red-600 transition-colors p-2 bg-[var(--bg-alt)] rounded-sm"><Trash2 size={14} /></button>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                        <div className="flex flex-col items-end gap-1 pt-6 mt-6 border-t border-[var(--border-soft)]">
-                          {order.discount > 0 && <p className="text-xs font-medium text-red-500 uppercase tracking-widest">Remise: -{order.discount.toFixed(2)} €</p>}
-                          <p className="font-cormorant text-2xl font-medium mt-1">Total: {order.total.toFixed(2)} €</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+
+                            {/* Adresse */}
+                            {order.shippingAddress && (
+                              <div className="mb-4 p-3 bg-[var(--bg-alt)] rounded-sm border border-[var(--border-soft)]">
+                                <p className="text-[10px] uppercase tracking-widest font-medium text-[var(--text-muted)] mb-1">Adresse de livraison</p>
+                                <p className="text-sm">{order.shippingAddress}</p>
+                              </div>
+                            )}
+
+                            {/* Tracking Number */}
+                            <div className="mb-4">
+                              <p className="text-[10px] uppercase tracking-widest font-medium text-[var(--text-muted)] mb-2">Numéro de suivi</p>
+                              {order.trackingNumber && !trackingInputs[order.id] && (
+                                <p className="text-xs font-mono font-medium mb-2 text-green-700">✓ {order.trackingNumber}</p>
+                              )}
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Ex: 1Z999AA10123456784"
+                                  value={trackingVal}
+                                  onChange={e => setTrackingInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                  className="flex-1 px-3 py-2 text-xs bg-[var(--bg-alt)] border border-transparent focus:border-black rounded-sm outline-none"
+                                />
+                                <button
+                                  onClick={() => handleSaveTracking(order.id)}
+                                  className="px-4 py-2 bg-black text-white text-[10px] uppercase tracking-widest font-medium rounded-sm hover:bg-black/80"
+                                >Enregistrer</button>
+                              </div>
+                            </div>
+
+                            {/* Articles + sélection remboursement */}
+                            <div className="flex flex-col gap-3 mb-4">
+                              {order.items.map((item) => {
+                                const isSelected = selectedItems.includes(item.id);
+                                const isRefunded = item.refunded;
+                                return (
+                                  <div key={item.id} className={`flex gap-4 items-center p-3 rounded-sm border transition-colors ${isRefunded ? 'opacity-40 bg-[var(--bg-alt)] border-[var(--border-soft)]' : isSelected ? 'border-orange-400 bg-orange-50' : 'border-transparent hover:bg-[var(--bg-alt)]'}`}>
+                                    <input
+                                      type="checkbox"
+                                      disabled={!!isRefunded}
+                                      checked={isSelected}
+                                      onChange={() => toggleRefundItem(order.id, item.id)}
+                                      className="w-4 h-4 accent-orange-500 flex-shrink-0"
+                                    />
+                                    {item.product?.image ? (
+                                      <div className="relative w-10 h-14 bg-[var(--bg-alt)] rounded-xs overflow-hidden flex-shrink-0">
+                                        <Image src={item.product.image} alt={item.product.name} fill className="object-cover" />
+                                      </div>
+                                    ) : (
+                                      <div className="w-10 h-14 bg-[var(--bg-alt)] border border-dashed border-[var(--border-soft)] rounded-xs flex items-center justify-center text-[7px] text-[var(--text-muted)] flex-shrink-0">IMG</div>
+                                    )}
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium">{item.product?.name ?? 'Produit'}</p>
+                                      <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest mt-0.5">Qté: {item.quantity} {item.size && `• ${item.size}`} {isRefunded && '• Remboursé'}</p>
+                                    </div>
+                                    <p className="font-medium text-sm">{(item.price * item.quantity).toFixed(2)} €</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="flex flex-wrap items-center justify-between pt-4 border-t border-[var(--border-soft)] gap-4">
+                              <div className="flex flex-col gap-1">
+                                {order.discount > 0 && <p className="text-xs font-medium text-red-500 uppercase tracking-widest">Remise: -{order.discount.toFixed(2)} €</p>}
+                                <p className="font-cormorant text-2xl font-medium">Total: {order.total.toFixed(2)} €</p>
+                              </div>
+                              {selectedItems.length > 0 && (
+                                <button
+                                  onClick={() => handleRefund(order.id)}
+                                  disabled={refundLoading === order.id}
+                                  className="px-5 py-2 bg-orange-500 text-white text-[10px] uppercase tracking-widest font-medium rounded-sm hover:bg-orange-600 disabled:opacity-50"
+                                >
+                                  {refundLoading === order.id ? 'En cours...' : `Rembourser (${selectedItems.length} article${selectedItems.length > 1 ? 's' : ''})`}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </motion.div>
             )}
 

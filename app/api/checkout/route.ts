@@ -111,11 +111,14 @@ export async function POST(req: Request) {
       };
     });
 
+    const encodedAddr = shippingAddress ? encodeURIComponent(shippingAddress) : '';
+    const encodedSc = storeCreditCode ? encodeURIComponent(storeCreditCode) : '';
+
     const sessionData: any = {
       payment_method_types: ['card'],
       line_items: line_items_ttc,
       mode: 'payment',
-      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}${encodedAddr ? `&addr=${encodedAddr}` : ''}${encodedSc ? `&sc=${encodedSc}` : ''}`,
       cancel_url: `${origin}/checkout/cancel`,
       metadata: {
         order_details: JSON.stringify(items.map((i: any) => ({ id: i.product.id, variantId: i.variantId, q: i.quantity }))),
