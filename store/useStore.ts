@@ -43,6 +43,7 @@ interface CartStore {
   addToCart: (product: Product, size?: Size) => void;
   removeFromCart: (productId: string, size?: Size) => void;
   updateQuantity: (productId: string, quantity: number, size?: Size) => void;
+  setCart: (items: CartItem[]) => void;
   clearCart: () => void;
   toggleCart: () => void;
   closeCart: () => void;
@@ -86,6 +87,7 @@ export const useStore = create<CartStore>()(
       },
 
       clearCart: () => set({ cart: [] }),
+      setCart: (items) => set({ cart: items }),
       toggleCart: () => set((state) => ({ isCartOpen: !state.isCartOpen })),
       closeCart: () => set({ isCartOpen: false }),
     }),

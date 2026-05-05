@@ -5,6 +5,7 @@ import { useStore } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
 
 export function CartDrawer() {
   const isOpen = useStore((s) => s.isCartOpen);
@@ -15,20 +16,27 @@ export function CartDrawer() {
   const updateQuantity = useStore((s) => s.updateQuantity);
   const { showToast } = useToast();
 
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
   const placeOrder = async () => {
     if (!cart.length) return;
-    const res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: cart, discountAmount: 0, source: 'en_ligne' }),
-    });
-    if (res.ok) {
-      clearCart();
-      showToast('Commande validée avec succès', 'success');
-      closeCart();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      showToast(data.error || 'Erreur lors de la commande', 'error');
+    setIsCheckingOut(true);
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: cart, discountAmount: 0 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        showToast(data.error || 'Erreur lors du paiement', 'error');
+        setIsCheckingOut(false);
+      }
+    } catch (err) {
+      showToast('Erreur réseau', 'error');
+      setIsCheckingOut(false);
     }
   };
 
@@ -119,8 +127,8 @@ export function CartDrawer() {
                     <span>Total TTC</span><span>{total.toFixed(2)} €</span>
                   </div>
                 </div>
-                <button onClick={handleCheckout} className="btn-primary w-full py-4 text-xs rounded-sm">
-                  Valider la commande
+                <button onClick={handleCheckout} disabled={isCheckingOut} className="btn-primary w-full py-4 text-xs rounded-sm disabled:opacity-50">
+                  {isCheckingOut ? 'Redirection vers Stripe...' : 'Valider la commande'}
                 </button>
               </div>
             )}
