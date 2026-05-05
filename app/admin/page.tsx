@@ -289,6 +289,20 @@ export default function AdminPage() {
                     <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Prix (€)</label>
                     <input type="number" step="0.01" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)||0})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
                   </div>
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Code-barres (10 chif.)</label>
+                    <input type="text" maxLength={10} value={editingProduct.barcode || ''} onChange={e => setEditingProduct({...editingProduct, barcode: e.target.value || null})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">ID Court (4 chif.)</label>
+                    <input type="text" maxLength={4} value={editingProduct.shortId || ''} onChange={e => setEditingProduct({...editingProduct, shortId: e.target.value || null})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
+                  </div>
+                  <div className="md:col-span-2 flex items-center">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox" checked={editingProduct.featured ?? false} onChange={e => setEditingProduct({...editingProduct, featured: e.target.checked})} className="w-4 h-4 text-black border-[var(--border-soft)] rounded-xs" />
+                      <span className="text-[10px] tracking-widest uppercase font-medium text-black">Produit mis en avant</span>
+                    </label>
+                  </div>
                 </div>
                 
                 <div>
@@ -317,7 +331,10 @@ export default function AdminPage() {
                       }} className="w-20 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
                       <input type="text" placeholder="Code-barres" value={v.barcode || ''} onChange={e => {
                         const newV = [...editingProduct.variants]; newV[i].barcode = e.target.value; setEditingProduct({...editingProduct, variants: newV});
-                      }} className="flex-1 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
+                      }} className="w-28 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
+                      <input type="text" placeholder="ID Court" maxLength={4} value={v.shortId || ''} onChange={e => {
+                        const newV = [...editingProduct.variants]; newV[i].shortId = e.target.value; setEditingProduct({...editingProduct, variants: newV});
+                      }} className="w-20 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
                       <button type="button" onClick={() => {
                         setEditingProduct({...editingProduct, variants: editingProduct.variants.filter((_, idx) => idx !== i)});
                       }} className="p-2 text-red-500 hover:bg-red-50 rounded-sm"><Trash2 size={16}/></button>

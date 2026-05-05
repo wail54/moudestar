@@ -2,9 +2,9 @@
 
 import { useState, useRef } from 'react';
 import Image from 'next/image';
-import { ImagePlus, Trash2, Loader2 } from 'lucide-react';
+import { ImagePlus, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
-import { createClient } from '@/lib/supabase/client';
+import { createBrowserClient } from '@supabase/ssr';
 
 interface Props {
   images: string[];
@@ -13,13 +13,20 @@ interface Props {
 
 export function ImageUploader({ images, onChange }: Props) {
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const supabase = createClient();
+
+  // Créer le client Supabase directement avec les variables d'env
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+  );
 
   const uploadFiles = async (files: FileList) => {
     if (!files.length) return;
     setUploading(true);
+    setUploadError(null);
     const uploaded: string[] = [];
 
     for (const file of Array.from(files)) {
@@ -31,32 +38,40 @@ export function ImageUploader({ images, onChange }: Props) {
           useWebWorker: true,
         });
 
-        const ext = file.name.split('.').pop() || 'jpg';
-        const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+        const path = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-        const { error } = await supabase.storage
+        const { data: uploadData, error: uploadErr } = await supabase.storage
           .from('product-images')
-          .upload(path, compressed, { contentType: compressed.type, upsert: false });
+          .upload(path, compressed, {
+            contentType: compressed.type || `image/${ext}`,
+            upsert: false,
+          });
 
-        if (error) { console.error('Upload error:', error.message); continue; }
+        if (uploadErr) {
+          console.error('Upload error:', uploadErr);
+          setUploadError(`Erreur upload: ${uploadErr.message}`);
+          continue;
+        }
 
         const { data: publicData } = supabase.storage
           .from('product-images')
-          .getPublicUrl(path);
+          .getPublicUrl(uploadData.path);
 
         if (publicData?.publicUrl) {
           uploaded.push(publicData.publicUrl);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Compression/upload error:', e);
+        setUploadError(`Erreur: ${e?.message || 'inconnue'}`);
       }
     }
 
     if (uploaded.length > 0) {
       onChange([...images, ...uploaded]);
+      setUploadError(null);
     }
     setUploading(false);
-    // Reset input so same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -64,6 +79,7 @@ export function ImageUploader({ images, onChange }: Props) {
     if (!urlInput.trim()) return;
     onChange([...images, urlInput.trim()]);
     setUrlInput('');
+    setUploadError(null);
   };
 
   const removeImage = (index: number) => {
@@ -72,7 +88,7 @@ export function ImageUploader({ images, onChange }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* File upload — captures camera on mobile */}
+      {/* File upload zone */}
       <div
         onClick={() => fileInputRef.current?.click()}
         className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed border-[var(--border-soft)] rounded-sm cursor-pointer hover:border-black hover:bg-[var(--bg-alt)] transition-colors"
@@ -82,14 +98,13 @@ export function ImageUploader({ images, onChange }: Props) {
           type="file"
           accept="image/*"
           multiple
-          capture={undefined}
           className="hidden"
           onChange={(e) => e.target.files && uploadFiles(e.target.files)}
         />
         {uploading ? (
           <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
             <Loader2 size={18} className="animate-spin" />
-            Compression & upload en cours...
+            Compression &amp; upload en cours...
           </div>
         ) : (
           <>
@@ -97,7 +112,7 @@ export function ImageUploader({ images, onChange }: Props) {
             <div className="text-center">
               <p className="text-sm font-medium">Cliquez pour ajouter des photos</p>
               <p className="text-[10px] text-[var(--text-muted)] mt-1 uppercase tracking-widest">
-                Photo depuis l&apos;appareil photo · Galerie · Fichier
+                Photo · Galerie · Fichier
               </p>
               <p className="text-[9px] text-[var(--text-muted)] mt-1">
                 Compression automatique — max 1 Mo par image
@@ -106,6 +121,14 @@ export function ImageUploader({ images, onChange }: Props) {
           </>
         )}
       </div>
+
+      {/* Error display */}
+      {uploadError && (
+        <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-sm">
+          <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-red-600">{uploadError}</p>
+        </div>
+      )}
 
       {/* URL fallback */}
       <div className="flex gap-2">
@@ -132,7 +155,7 @@ export function ImageUploader({ images, onChange }: Props) {
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
           {images.map((img, idx) => (
             <div key={idx} className="relative aspect-square rounded-sm overflow-hidden border border-[var(--border-soft)] group">
-              <Image src={img} alt={`Image ${idx + 1}`} fill className="object-cover" sizes="120px" />
+              <Image src={img} alt={`Image ${idx + 1}`} fill className="object-cover" sizes="120px" unoptimized />
               <button
                 type="button"
                 onClick={() => removeImage(idx)}
