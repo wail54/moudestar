@@ -26,11 +26,16 @@ export async function GET(req: Request) {
     const orders = await prisma.order.findMany({
       where: { userId },
       include: {
-        items: { include: { product: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, images: true } },
+            variant: { select: { size: true, color: true } },
+          },
+        },
       },
       orderBy: { date: 'desc' },
     });
-    
+
     return NextResponse.json(orders);
   } catch (error) {
     console.error('[GET /api/account/orders]', error);
