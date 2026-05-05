@@ -211,7 +211,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
             <button
               onClick={handleAdd}
-              disabled={isOutOfStock || (product.sizeType !== 'NONE' && !selectedVariant) || (selectedVariant && selectedVariant.stock === 0)}
+              disabled={!!isOutOfStock || (product.sizeType !== 'NONE' && !selectedVariant) || !!(selectedVariant && selectedVariant.stock === 0)}
               className="btn-primary w-full py-5 text-sm rounded-sm mt-auto"
             >
               <ShoppingBag size={16} />

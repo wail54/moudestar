@@ -117,6 +117,7 @@ model StoreCredit {
   code          String    @unique  // Ex: "AVOIR-XK4T2" — généré automatiquement
   amount        Float     // Montant initial de l'avoir
   remaining     Float     // Montant restant à utiliser
+  isActive      Boolean   @default(true) // False si entièrement utilisé ou annulé
   userId        String?   // FK → Profile (null = avoir anonyme / caisse)
   issuedAt      DateTime  @default(now())
   expiresAt     DateTime? // Optionnel — null = permanent
