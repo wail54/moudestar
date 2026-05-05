@@ -3,12 +3,10 @@
 import { useState, useEffect, use } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { ArrowLeft, ShoppingBag } from 'lucide-react';
-import { useStore, Size, Product, toFrontendProduct } from '@/store/useStore';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useStore, Product, ProductVariant } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
-
-const SIZES: Size[] = ['S', 'M', 'L', 'XL'];
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -16,14 +14,29 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const addToCart = useStore((s) => s.addToCart);
   const { showToast } = useToast();
-  const [selectedSize, setSelectedSize] = useState<Size | null>(null);
+  
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     fetch('/api/products')
       .then((r) => r.json())
       .then((data: Product[]) => {
         const found = data.find((p) => p.id === resolvedParams.id);
-        setProduct(found ? toFrontendProduct(found) : null);
+        if (found) {
+          // Utilise le type du state store/useStore
+          setProduct(found);
+          // Pré-sélection
+          if (found.variants && found.variants.length > 0) {
+            const availableVariants = found.variants.filter(v => v.stock > 0);
+            const initialVariant = availableVariants[0] || found.variants[0];
+            setSelectedColor(initialVariant.color);
+            setSelectedSize(initialVariant.size);
+            setSelectedVariant(initialVariant);
+          }
+        }
         setLoading(false);
       })
       .catch((e) => {
@@ -32,33 +45,49 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       });
   }, [resolvedParams.id]);
 
+  useEffect(() => {
+    if (product?.variants) {
+      const v = product.variants.find(v => v.color === selectedColor && v.size === selectedSize);
+      setSelectedVariant(v || null);
+    }
+  }, [selectedColor, selectedSize, product]);
+
   if (loading) return <div className="min-h-screen bg-[var(--bg-main)]" />;
 
   if (!product) return (
-    <div className="min-h-screen pt-32 pb-32 flex flex-col items-center text-center">
+    <div className="min-h-screen pt-32 pb-32 flex flex-col items-center text-center bg-[var(--bg-main)]">
       <h1 className="font-cormorant text-4xl mb-4">Produit introuvable</h1>
       <Link href="/boutique" className="btn-outline">Retour à la boutique</Link>
     </div>
   );
 
-  const hasSizes = product.stock
-    ? Object.values(product.stock).some((v) => v > 0)
-    : false;
-  const stockForSize = (size: Size): number => product.stock ? product.stock[size] : 0;
-  const hasStockField = !!product.stock;
-  
-  const isAvailable = hasStockField ? selectedSize !== null && stockForSize(selectedSize) > 0 : true;
-  const totalStock = product.stock ? Object.values(product.stock).reduce((a, b) => a + b, 0) : null;
-  const isOutOfStock = totalStock !== null && totalStock === 0;
+  const images = product.images?.length > 0 ? product.images : (product.image ? [product.image] : []);
+  const totalStock = product.variants?.reduce((acc, v) => acc + v.stock, 0) ?? 0;
+  const isOutOfStock = product.sizeType !== 'NONE' && totalStock === 0;
+
+  // Extraire couleurs et tailles uniques
+  const colors = Array.from(new Set(product.variants?.map(v => v.color).filter(Boolean))) as string[];
+  const sizesForColor = product.variants?.filter(v => !selectedColor || v.color === selectedColor).map(v => v.size).filter(Boolean) as string[];
 
   const handleAdd = () => {
-    if (!isAvailable || isOutOfStock) return;
-    addToCart(product, selectedSize ?? undefined);
+    if (isOutOfStock) return;
+    
+    if (product.sizeType !== 'NONE' && !selectedVariant) {
+      showToast('Veuillez sélectionner une option valide', 'error');
+      return;
+    }
+    
+    if (selectedVariant && selectedVariant.stock <= 0) {
+      showToast('Cette variante est en rupture de stock', 'error');
+      return;
+    }
+
+    addToCart(product, selectedVariant?.id, selectedVariant?.size || undefined, selectedVariant?.color || undefined);
     showToast(`Produit ajouté au panier`, 'success');
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-32">
+    <div className="min-h-screen pt-24 pb-32 bg-[var(--bg-main)]">
       <div className="max-w-screen-xl mx-auto px-6 md:px-10">
         
         <Link href="/boutique" className="inline-flex items-center gap-2 text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] hover:text-black transition-colors mb-10">
@@ -66,19 +95,40 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </Link>
 
         <div className="flex flex-col md:flex-row gap-12 lg:gap-20">
-          {/* IMAGE */}
+          {/* IMAGE GALLERY */}
           <motion.div 
-            className="w-full md:w-1/2 relative aspect-[3/4] bg-white border border-[var(--border-soft)] rounded-sm overflow-hidden flex items-center justify-center"
+            className="w-full md:w-1/2 flex flex-col gap-4"
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
           >
-            {product.image ? (
-              <Image src={product.image} alt={product.name} fill priority className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
-            ) : (
-              <span className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-widest">Aperçu indisponible</span>
-            )}
-            {isOutOfStock && (
-              <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
-                <span className="font-medium tracking-widest uppercase px-6 py-3 bg-white shadow-lg text-sm rounded-xs">Épuisé</span>
+            <div className="relative aspect-[3/4] bg-white border border-[var(--border-soft)] rounded-sm overflow-hidden flex items-center justify-center">
+              {images.length > 0 ? (
+                <>
+                  <Image src={images[currentImageIndex]} alt={product.name} fill priority className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
+                  
+                  {images.length > 1 && (
+                    <div className="absolute inset-0 flex items-center justify-between p-4 opacity-0 hover:opacity-100 transition-opacity">
+                      <button onClick={() => setCurrentImageIndex((p) => p === 0 ? images.length - 1 : p - 1)} className="p-2 bg-white/80 rounded-full hover:bg-white text-black"><ChevronLeft size={20}/></button>
+                      <button onClick={() => setCurrentImageIndex((p) => p === images.length - 1 ? 0 : p + 1)} className="p-2 bg-white/80 rounded-full hover:bg-white text-black"><ChevronRight size={20}/></button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <span className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-widest">Aperçu indisponible</span>
+              )}
+              {isOutOfStock && (
+                <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                  <span className="font-medium tracking-widest uppercase px-6 py-3 bg-white shadow-lg text-sm rounded-xs">Épuisé</span>
+                </div>
+              )}
+            </div>
+            {/* THUMBNAILS */}
+            {images.length > 1 && (
+              <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
+                {images.map((img, idx) => (
+                  <button key={idx} onClick={() => setCurrentImageIndex(idx)} className={`relative w-20 h-24 flex-shrink-0 rounded-sm overflow-hidden border transition-colors ${currentImageIndex === idx ? 'border-black' : 'border-transparent opacity-60 hover:opacity-100'}`}>
+                    <Image src={img} alt="" fill className="object-cover" />
+                  </button>
+                ))}
               </div>
             )}
           </motion.div>
@@ -96,49 +146,76 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {product.description}
             </div>
 
-            {hasStockField && (
-              <div className="mb-10">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-xs font-medium uppercase tracking-widest">Tailles</p>
-                  {selectedSize && <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest">{selectedSize} sélectionné</p>}
-                </div>
-                <div className="flex gap-3">
-                  {SIZES.map((sz) => {
-                    const qty = stockForSize(sz);
-                    const isOos = qty === 0;
-                    const isSelected = selectedSize === sz;
-                    return (
-                      <button
-                        key={sz}
-                        disabled={isOos}
-                        onClick={() => setSelectedSize(sz)}
-                        className={`relative w-14 h-14 flex items-center justify-center text-sm font-medium transition-all rounded-sm ${
-                          isSelected ? 'bg-black text-white border border-black' : isOos ? 'bg-[var(--bg-alt)] text-[var(--text-muted)] border border-transparent cursor-not-allowed' : 'bg-white border border-[var(--border-soft)] hover:border-black text-black'
-                        }`}
-                      >
-                        {sz}
-                        {isOos && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-full h-px bg-[var(--text-muted)] rotate-45 scale-110" />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                {hasStockField && !selectedSize && !isOutOfStock && hasSizes && (
-                  <p className="text-[10px] text-red-500 uppercase tracking-widest mt-4">Veuillez choisir une taille</p>
+            {product.sizeType !== 'NONE' && (
+              <div className="mb-10 flex flex-col gap-6">
+                
+                {/* COULEURS */}
+                {colors.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-medium uppercase tracking-widest">Couleur</p>
+                      {selectedColor && <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest">{selectedColor}</p>}
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {colors.map(color => (
+                        <button
+                          key={color}
+                          onClick={() => setSelectedColor(color)}
+                          className={`px-4 py-2 text-xs font-medium transition-all rounded-sm border ${
+                            selectedColor === color ? 'bg-black text-white border-black' : 'bg-white border-[var(--border-soft)] hover:border-black text-black'
+                          }`}
+                        >
+                          {color}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
+
+                {/* TAILLES */}
+                {sizesForColor.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-medium uppercase tracking-widest">Taille</p>
+                      {selectedSize && <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest">{selectedSize} sélectionné</p>}
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {sizesForColor.map((sz) => {
+                        const variant = product.variants.find(v => v.size === sz && (!selectedColor || v.color === selectedColor));
+                        const isOos = !variant || variant.stock === 0;
+                        const isSelected = selectedSize === sz;
+                        return (
+                          <button
+                            key={sz}
+                            disabled={isOos}
+                            onClick={() => setSelectedSize(sz)}
+                            className={`relative w-14 h-14 flex items-center justify-center text-sm font-medium transition-all rounded-sm ${
+                              isSelected ? 'bg-black text-white border-black' : isOos ? 'bg-[var(--bg-alt)] text-[var(--text-muted)] border-transparent cursor-not-allowed' : 'bg-white border-[var(--border-soft)] hover:border-black text-black border'
+                            }`}
+                          >
+                            {sz}
+                            {isOos && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-full h-px bg-[var(--text-muted)] rotate-45 scale-110" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
               </div>
             )}
 
             <button
               onClick={handleAdd}
-              disabled={isOutOfStock || (hasStockField && !selectedSize)}
+              disabled={isOutOfStock || (product.sizeType !== 'NONE' && !selectedVariant) || (selectedVariant && selectedVariant.stock === 0)}
               className="btn-primary w-full py-5 text-sm rounded-sm mt-auto"
             >
               <ShoppingBag size={16} />
-              {isOutOfStock ? 'Rupture de stock' : 'Ajouter au panier'}
+              {isOutOfStock ? 'Rupture de stock' : (!selectedVariant && product.sizeType !== 'NONE') ? 'Sélectionner une option' : selectedVariant?.stock === 0 ? 'Variante épuisée' : 'Ajouter au panier'}
             </button>
           </motion.div>
         </div>

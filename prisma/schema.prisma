@@ -7,80 +7,175 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── Produits ─────────────────────────────────────────────────────────────────
-
-model Product {
-  id          String      @id @default(cuid())
-  name        String
-  description String      @default("")
-  price       Float
-  image       String      @default("")
-  category    String
-  featured    Boolean     @default(false)
-  stockS      Int         @default(0)
-  stockM      Int         @default(0)
-  stockL      Int         @default(0)
-  stockXL     Int         @default(0)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  orderItems  OrderItem[]
-  savedCarts  SavedCart[]
-}
-
-// ─── Commandes ────────────────────────────────────────────────────────────────
-
-model Order {
-  id        String      @id @default(cuid())
-  date      DateTime    @default(now())
-  userId    String?     // Optionnel : null = commande invité
-  subtotal  Float
-  discount  Float       @default(0)
-  tva       Float
-  total     Float
-  status    String      @default("En attente")
-  source    String      @default("en_ligne")
-  shippingAddress String?
-  items     OrderItem[]
-  profile   Profile?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-}
-
-model OrderItem {
-  id        String   @id @default(cuid())
-  orderId   String
-  productId String
-  quantity  Int
-  size      String?
-  price     Float
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
-}
-
-// ─── Utilisateurs & Rôles ─────────────────────────────────────────────────────
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Role {
   USER
   ADMIN
 }
 
-model Profile {
-  id        String   @id
-  email     String   @unique
-  role      Role     @default(USER)
-  orders    Order[]
-  cartItems SavedCart[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum SizeType {
+  NONE      // Taille unique — pas de sélection
+  CLOTHING  // XS, S, M, L, XL, XXL
+  SHOES     // 38, 39, 40, 41, 42, 43, 44, 45, 46
 }
 
-// Panier sauvegardé en base par utilisateur
-model SavedCart {
+// ─── Produits ─────────────────────────────────────────────────────────────────
+
+model Product {
+  id          String           @id @default(cuid())
+  name        String
+  description String           @default("")
+  price       Float
+  images      String[]         // Galerie d'images (1ère = image principale)
+  category    String
+  featured    Boolean          @default(false)
+  sizeType    SizeType         @default(NONE)
+  barcode     String?          @unique  // Code-barres 10 chiffres (lecture caisse)
+  shortId     String?          @unique  // ID court 4 chiffres (saisie rapide caisse)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  variants    ProductVariant[]
+  orderItems  OrderItem[]
+  savedCarts  SavedCart[]
+}
+
+model ProductVariant {
   id        String   @id @default(cuid())
+  productId String
+  color     String?  // Optionnel ex: "Noir", "Blanc"
+  size      String?  // Optionnel ex: "M", "42" — dépend du sizeType du produit
+  stock     Int      @default(0)
+  barcode   String?  @unique  // Code-barres propre à cette variante
+  shortId   String?  @unique  // ID court propre à cette variante
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  savedCarts SavedCart[]
+
+  @@unique([productId, color, size])
+}
+
+// ─── Commandes ────────────────────────────────────────────────────────────────
+
+model Order {
+  id              String    @id @default(cuid())
+  date            DateTime  @default(now())
+  userId          String?   // Optionnel : null = commande invité
+  subtotal        Float
+  discount        Float     @default(0)
+  tva             Float
+  total           Float
+  status          String    @default("En attente")
+  source          String    @default("en_ligne") // "en_ligne" | "caisse"
+  shippingAddress String?
+
+  // Paiement hybride
+  paymentMethod   String    @default("stripe") // "stripe" | "cash" | "card_terminal" | "voucher" | "mixed"
+  voucherCode     String?   // Code du bon "client en compte" utilisé
+  voucherAmount   Float?    // Montant du bon utilisé
+  creditCode      String?   // Code de l'avoir (StoreCredit) utilisé
+  creditUsed      Float?    // Montant d'avoir déduit
+
+  // Suivi & admin
+  trackingNumber  String?   // Numéro de suivi colis
+  notes           String?   // Notes internes admin
+  refundStatus    String?   // null | "partial" | "full"
+
+  items          OrderItem[]
+  profile        Profile?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  refundRequests RefundRequest[]
+  creditsIssued  StoreCredit[]    // Avoirs générés par cette commande
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  productId   String
+  variantId   String?  // FK vers ProductVariant (remplace le size en string)
+  quantity    Int
+  size        String?  // Conservé en string pour rétrocompatibilité & caisse sans variante
+  color       String?  // Couleur au moment de la commande
+  price       Float
+
+  // Remboursement
+  refunded    Boolean   @default(false)
+  refundedAt  DateTime?
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+}
+
+// ─── Avoirs (Store Credits) ───────────────────────────────────────────────────
+
+model StoreCredit {
+  id            String    @id @default(cuid())
+  code          String    @unique  // Ex: "AVOIR-XK4T2" — généré automatiquement
+  amount        Float     // Montant initial de l'avoir
+  remaining     Float     // Montant restant à utiliser
+  userId        String?   // FK → Profile (null = avoir anonyme / caisse)
+  issuedAt      DateTime  @default(now())
+  expiresAt     DateTime? // Optionnel — null = permanent
+  usedAt        DateTime? // Date dernière utilisation
+  sourceOrderId String?   // FK → Order (commande qui a généré cet avoir)
+  reason        String    // "refund" | "voucher_change"
+
+  profile     Profile? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sourceOrder Order?   @relation(fields: [sourceOrderId], references: [id], onDelete: SetNull)
+}
+
+// ─── Demandes de Remboursement (SAV) ─────────────────────────────────────────
+
+model RefundRequest {
+  id          String    @id @default(cuid())
+  orderId     String
+  userId      String
+  reason      String    // Motif libre du client
+  status      String    @default("pending") // "pending" | "approved" | "rejected"
+  adminNote   String?   // Réponse ou note de l'admin
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Utilisateurs & Rôles ─────────────────────────────────────────────────────
+
+model Profile {
+  id             String    @id
+  email          String    @unique
+  role           Role      @default(USER)
+  firstName      String?
+  lastName       String?
+  phone          String?
+  defaultAddress String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  orders          Order[]
+  cartItems       SavedCart[]
+  storeCredits    StoreCredit[]
+  refundRequests  RefundRequest[]
+}
+
+// ─── Panier Sauvegardé ────────────────────────────────────────────────────────
+
+model SavedCart {
+  id        String  @id @default(cuid())
   userId    String
   productId String
+  variantId String? // FK → ProductVariant (remplace size string)
   quantity  Int
-  size      String?
-  profile   Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size      String? // Conservé pour rétrocompatibilité
 
-  @@unique([userId, productId, size])
+  profile Profile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, productId, variantId])
 }

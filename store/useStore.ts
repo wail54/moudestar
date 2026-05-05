@@ -5,8 +5,17 @@ import { persist } from 'zustand/middleware';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type Size = 'S' | 'M' | 'L' | 'XL';
-export type StockBySizes = Record<Size, number>;
+export type SizeType = 'NONE' | 'CLOTHING' | 'SHOES';
+
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  color: string | null;
+  size: string | null;
+  stock: number;
+  barcode: string | null;
+  shortId: string | null;
+}
 
 /** Produit tel que retourné par l'API /api/products */
 export interface Product {
@@ -14,24 +23,26 @@ export interface Product {
   name: string;
   description: string;
   price: number;
-  image: string;
+  images: string[];
   category: string;
   featured: boolean;
-  stockS: number;
-  stockM: number;
-  stockL: number;
-  stockXL: number;
+  sizeType: SizeType;
+  barcode: string | null;
+  shortId: string | null;
   createdAt?: string;
   updatedAt?: string;
-  /** Commodité front-end — construit depuis stockS/M/L/XL */
-  stock?: StockBySizes;
+  variants: ProductVariant[];
+  
+  // Commodité: on garde l'ancienne propriété `image` qui pointe vers la première image du tableau
+  image?: string;
 }
 
 export interface CartItem {
   product: Product;
   quantity: number;
-  /** Taille sélectionnée (optionnel pour les accessoires) */
-  size?: Size;
+  variantId?: string;
+  size?: string; // pour rétrocompatibilité
+  color?: string; // optionnel
 }
 
 // ─── Store (panier + UI seulement) ───────────────────────────────────────────
@@ -40,9 +51,9 @@ interface CartStore {
   cart: CartItem[];
   isCartOpen: boolean;
 
-  addToCart: (product: Product, size?: Size) => void;
-  removeFromCart: (productId: string, size?: Size) => void;
-  updateQuantity: (productId: string, quantity: number, size?: Size) => void;
+  addToCart: (product: Product, variantId?: string, size?: string, color?: string) => void;
+  removeFromCart: (productId: string, variantId?: string) => void;
+  updateQuantity: (productId: string, quantity: number, variantId?: string) => void;
   setCart: (items: CartItem[]) => void;
   clearCart: () => void;
   toggleCart: () => void;
@@ -55,28 +66,28 @@ export const useStore = create<CartStore>()(
       cart: [],
       isCartOpen: false,
 
-      addToCart: (product, size) => {
+      addToCart: (product, variantId, size, color) => {
         const { cart } = get();
-        const key = (i: CartItem) =>
-          i.product.id === product.id && i.size === size;
+        // Clé unique pour identifier un article: même ID produit et même variante (ou taille par défaut)
+        const key = (i: CartItem) => i.product.id === product.id && i.variantId === variantId && i.size === size && i.color === color;
         const existing = cart.find(key);
         if (existing) {
           set({ cart: cart.map((i) => (key(i) ? { ...i, quantity: i.quantity + 1 } : i)) });
         } else {
-          set({ cart: [...cart, { product, quantity: 1, size }] });
+          set({ cart: [...cart, { product, quantity: 1, variantId, size, color }] });
         }
       },
 
-      removeFromCart: (productId, size) => {
+      removeFromCart: (productId, variantId) => {
         set((state) => ({
           cart: state.cart.filter(
-            (i) => !(i.product.id === productId && i.size === size)
+            (i) => !(i.product.id === productId && i.variantId === variantId)
           ),
         }));
       },
 
-      updateQuantity: (productId, quantity, size) => {
-        const key = (i: CartItem) => i.product.id === productId && i.size === size;
+      updateQuantity: (productId, quantity, variantId) => {
+        const key = (i: CartItem) => i.product.id === productId && i.variantId === variantId;
         if (quantity <= 0) {
           set((state) => ({ cart: state.cart.filter((i) => !key(i)) }));
           return;
@@ -95,15 +106,10 @@ export const useStore = create<CartStore>()(
   )
 );
 
-// ─── Helper: convertir un produit DB en format stock front-end ────────────────
-export function toFrontendProduct(p: Product): Product {
+// ─── Helper: formater le produit pour le front-end ────────────────────────────
+export function toFrontendProduct(p: any): Product {
   return {
     ...p,
-    stock: {
-      S: p.stockS,
-      M: p.stockM,
-      L: p.stockL,
-      XL: p.stockXL,
-    },
+    image: p.images?.[0] || '', // backward compatibility
   };
 }

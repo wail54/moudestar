@@ -33,22 +33,21 @@ export async function GET() {
   }
 }
 
-// POST /api/orders — créer une commande
-// Body: { items: CartItem[], discountAmount: number, source: 'en_ligne' | 'caisse' }
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { items, discountAmount = 0, source = 'en_ligne', sessionId } = body;
+    const { items, source = 'en_ligne', sessionId, storeCreditCode, shippingAddress, paymentMethod } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: 'Panier vide' }, { status: 400 });
     }
 
-    // Récupérer l'utilisateur connecté si présent
     const userId = await getUserIdFromRequest(req);
 
-    let shippingAddress = null;
-    if (sessionId) {
+    let finalShippingAddress = shippingAddress || null;
+    let finalStoreCreditCode = storeCreditCode || null;
+
+    if (sessionId && !sessionId.startsWith('sc_')) {
       try {
         const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' as any });
         const session: any = await stripe.checkout.sessions.retrieve(sessionId);
@@ -56,14 +55,21 @@ export async function POST(req: Request) {
         let addrInfo = session.shipping_details?.address || session.customer_details?.address;
         let nameInfo = session.shipping_details?.name || session.customer_details?.name || session.customer_details?.email || '';
 
-        if (addrInfo) {
-          shippingAddress = [
+        if (!finalShippingAddress && addrInfo) {
+          finalShippingAddress = [
             nameInfo,
             addrInfo.line1,
             addrInfo.line2,
             `${addrInfo.postal_code} ${addrInfo.city}`,
             addrInfo.country
           ].filter(Boolean).join(', ');
+        }
+        
+        if (session.metadata?.storeCreditCode) {
+          finalStoreCreditCode = session.metadata.storeCreditCode;
+        }
+        if (!finalShippingAddress && session.metadata?.shippingAddress) {
+          finalShippingAddress = session.metadata.shippingAddress;
         }
       } catch (err: any) {
         console.error('[STRIPE] Erreur récupération session:', err.message || err);
@@ -72,34 +78,47 @@ export async function POST(req: Request) {
 
     const TVA_RATE = 0.20;
     const subtotal: number = items.reduce(
-      (sum: number, i: { product: { price: number }; quantity: number }) =>
-        sum + i.product.price * i.quantity,
+      (sum: number, i: any) => sum + i.product.price * i.quantity,
       0
     );
-    const discounted = Math.max(0, subtotal - discountAmount);
-    const tva = discounted * TVA_RATE;
-    const total = discounted + tva;
+    const tva = subtotal * TVA_RATE;
+    const grandTotal = subtotal + tva;
 
-    // Créer la commande et ses items en une seule transaction
+    let discountAmount = 0;
+    let storeCredit = null;
+
+    if (finalStoreCreditCode) {
+      storeCredit = await prisma.storeCredit.findUnique({ where: { code: finalStoreCreditCode } });
+      if (storeCredit && storeCredit.isActive && storeCredit.remaining > 0) {
+        if (!storeCredit.expiresAt || storeCredit.expiresAt >= new Date()) {
+          if (!storeCredit.userId || storeCredit.userId === userId) {
+            discountAmount = Math.min(grandTotal, storeCredit.remaining);
+          }
+        }
+      }
+    }
+
+    const total = grandTotal - discountAmount;
+
+    // Créer la commande et ses items
     const order = await prisma.order.create({
       data: {
         userId: userId ?? undefined,
-        shippingAddress,
+        shippingAddress: finalShippingAddress,
         subtotal,
         discount: discountAmount,
         tva,
         total,
-        status: source === 'caisse' ? 'Terminée' : 'En attente',
+        status: source === 'caisse' ? 'Terminée' : 'Confirmée', // Status mis à jour après paiement
         source,
+        paymentMethod: paymentMethod || 'STRIPE', // STRIPE par défaut, ou CARD/CASH si caisse
         items: {
-          create: items.map((item: {
-            product: { id: string; price: number };
-            quantity: number;
-            size?: string;
-          }) => ({
+          create: items.map((item: any) => ({
             productId: item.product.id,
+            variantId: item.variantId || null,
             quantity: item.quantity,
             size: item.size ?? null,
+            color: item.color ?? null,
             price: item.product.price,
           })),
         },
@@ -109,29 +128,32 @@ export async function POST(req: Request) {
       },
     });
 
-    // Mettre à jour le stock (décrémenter) pour chaque item
+    // Déduire l'avoir si utilisé
+    if (storeCredit && discountAmount > 0) {
+      await prisma.storeCredit.update({
+        where: { id: storeCredit.id },
+        data: {
+          remaining: Math.max(0, storeCredit.remaining - discountAmount),
+          isActive: storeCredit.remaining - discountAmount > 0, // Désactiver si vidé
+        }
+      });
+    }
+
+    // Mettre à jour le stock (décrémenter) pour chaque variant (ou fallback produit)
     await Promise.all(
-      items.map(async (item: {
-        product: { id: string };
-        quantity: number;
-        size?: string;
-      }) => {
-        if (!item.size) return;
-        const fieldMap: Record<string, string> = {
-          S: 'stockS', M: 'stockM', L: 'stockL', XL: 'stockXL',
-        };
-        const field = fieldMap[item.size];
-        if (!field) return;
-        const current = await prisma.product.findUnique({
-          where: { id: item.product.id },
-          select: { stockS: true, stockM: true, stockL: true, stockXL: true },
-        });
-        if (!current) return;
-        const currentVal = current[field as 'stockS' | 'stockM' | 'stockL' | 'stockXL'];
-        await prisma.product.update({
-          where: { id: item.product.id },
-          data: { [field]: Math.max(0, currentVal - item.quantity) },
-        });
+      items.map(async (item: any) => {
+        if (item.variantId) {
+          // Mise à jour de la variante
+          const currentVariant = await prisma.productVariant.findUnique({ where: { id: item.variantId }});
+          if (currentVariant) {
+            await prisma.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: Math.max(0, currentVariant.stock - item.quantity) }
+            });
+          }
+        } else {
+          // Rétrocompatibilité : produit sans variantes (stockS/M/L/XL legacy - ignoré ici car supprimé du schéma Prisma)
+        }
       })
     );
 

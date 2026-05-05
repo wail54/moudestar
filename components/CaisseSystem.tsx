@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Minus, Trash2, ShoppingCart, X, Tag, PenLine, Send } from 'lucide-react';
-import { CartItem, Product, Size, toFrontendProduct } from '@/store/useStore';
+import { CartItem, Product, ProductVariant } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
 
 const TVA = 0.20;
@@ -18,7 +18,7 @@ export function CaisseSystem() {
   useEffect(() => {
     fetch('/api/products')
       .then((r) => r.json())
-      .then((data: Product[]) => setProducts(data.map(toFrontendProduct)))
+      .then((data: Product[]) => setProducts(data))
       .catch(console.error);
   }, []);
 
@@ -32,7 +32,7 @@ export function CaisseSystem() {
   const [freeName, setFreeName] = useState('');
   const [freePrice, setFreePrice] = useState('');
   const [email, setEmail] = useState('');
-  const [sizeModalProduct, setSizeModalProduct] = useState<Product | null>(null);
+  const [variantModalProduct, setVariantModalProduct] = useState<Product | null>(null);
 
   const [showPayment, setShowPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card');
@@ -41,28 +41,36 @@ export function CaisseSystem() {
   const results = useMemo(() => {
     if (!query.trim()) return products;
     const q = query.toLowerCase();
-    return products.filter((p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+    // Search also by barcode and shortId
+    return products.filter((p) => {
+      if (p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)) return true;
+      if (p.barcode && p.barcode.includes(q)) return true;
+      if (p.shortId && p.shortId.includes(q)) return true;
+      if (p.variants?.some(v => (v.barcode && v.barcode.includes(q)) || (v.shortId && v.shortId.includes(q)))) return true;
+      return false;
+    });
   }, [products, query]);
 
   const handleProductClick = (p: Product) => {
-    if (p.stock) {
-      setSizeModalProduct(p);
+    if (p.sizeType !== 'NONE' || (p.variants && p.variants.length > 1)) {
+      setVariantModalProduct(p);
     } else {
-      addToPos(p, undefined);
+      const variant = p.variants?.[0];
+      addToPos(p, variant?.id, variant?.size || undefined, variant?.color || undefined);
     }
   };
 
-  const addToPos = (product: Product, size?: Size) => {
+  const addToPos = (product: Product, variantId?: string, size?: string, color?: string) => {
     setPosCart((prev) => {
-      const ex = prev.find((i) => i.product.id === product.id && i.size === size);
-      if (ex) return prev.map((i) => i.product.id === product.id && i.size === size ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { product, quantity: 1, size }];
+      const ex = prev.find((i) => i.product.id === product.id && i.variantId === variantId && i.size === size && i.color === color);
+      if (ex) return prev.map((i) => i.product.id === product.id && i.variantId === variantId && i.size === size && i.color === color ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { product, quantity: 1, variantId, size, color }];
     });
-    setSizeModalProduct(null);
+    setVariantModalProduct(null);
   };
 
-  const changeQty = (id: string, size: Size | undefined, delta: number) => {
-    setPosCart((prev) => prev.map((i) => i.product.id === id && i.size === size ? { ...i, quantity: i.quantity + delta } : i).filter((i) => i.quantity > 0));
+  const changeQty = (id: string, variantId: string | undefined, delta: number) => {
+    setPosCart((prev) => prev.map((i) => i.product.id === id && i.variantId === variantId ? { ...i, quantity: i.quantity + delta } : i).filter((i) => i.quantity > 0));
   };
 
   const addFreeItem = () => {
@@ -93,7 +101,7 @@ export function CaisseSystem() {
 
   const confirmPayment = async () => {
     const freeCartItems: CartItem[] = freeItems.map((fi) => ({
-      product: { id: fi.id, name: fi.name, price: fi.price, description: '', image: '', category: 'Libre', featured: false, stockS: 0, stockM: 0, stockL: 0, stockXL: 0 }, quantity: 1
+      product: { id: fi.id, name: fi.name, price: fi.price, description: '', images: [], category: 'Libre', featured: false, sizeType: 'NONE', barcode: null, shortId: null, variants: [] }, quantity: 1
     }));
 
     try {
@@ -104,6 +112,7 @@ export function CaisseSystem() {
           items: [...posCart, ...freeCartItems],
           discountAmount: discountAmt,
           source: 'caisse',
+          paymentMethod: paymentMethod === 'card' ? 'CARD' : 'CASH',
         }),
       });
       if (!res.ok) {
@@ -142,30 +151,46 @@ export function CaisseSystem() {
   return (
     <>
       <AnimatePresence>
-        {sizeModalProduct && (
-          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="bg-white p-8 w-full max-w-sm rounded-sm shadow-xl" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
+        {variantModalProduct && (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div className="bg-white p-6 md:p-8 w-full max-w-lg rounded-sm shadow-xl max-h-[90vh] overflow-y-auto" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
               <div className="flex justify-between items-center mb-6">
-                <h3 className="font-cormorant text-2xl font-light">Choisir la taille</h3>
-                <button onClick={() => setSizeModalProduct(null)} className="text-[var(--text-muted)] hover:text-black"><X size={20} /></button>
+                <h3 className="font-cormorant text-2xl font-light">Choisir la variante</h3>
+                <button onClick={() => setVariantModalProduct(null)} className="text-[var(--text-muted)] hover:text-black"><X size={20} /></button>
               </div>
-              <p className="text-sm font-medium mb-6">{sizeModalProduct.name}</p>
-              <div className="grid grid-cols-4 gap-3">
-                {['S', 'M', 'L', 'XL'].map(sz => {
-                  const qty = sizeModalProduct.stock ? sizeModalProduct.stock[sz as Size] : 0;
-                  const isOos = qty === 0;
-                  return (
-                    <button
-                      key={sz}
-                      disabled={isOos}
-                      onClick={() => addToPos(sizeModalProduct, sz as Size)}
-                      className={`py-3 text-sm font-medium rounded-sm border ${isOos ? 'bg-[var(--bg-alt)] text-[var(--text-muted)] border-[var(--border-soft)] opacity-50 cursor-not-allowed' : 'bg-white border-[var(--border-soft)] hover:border-black text-black'}`}
-                    >
-                      {sz}
-                    </button>
-                  );
-                })}
-              </div>
+              <p className="text-sm font-medium mb-6">{variantModalProduct.name}</p>
+              
+              {variantModalProduct.variants?.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {variantModalProduct.variants.map((v, i) => {
+                    const isOos = v.stock === 0;
+                    return (
+                      <button
+                        key={i}
+                        disabled={isOos}
+                        onClick={() => addToPos(variantModalProduct, v.id, v.size || undefined, v.color || undefined)}
+                        className={`flex justify-between items-center py-3 px-4 text-sm font-medium rounded-sm border transition-colors ${isOos ? 'bg-[var(--bg-alt)] text-[var(--text-muted)] border-[var(--border-soft)] opacity-50 cursor-not-allowed' : 'bg-white border-[var(--border-soft)] hover:border-black text-black'}`}
+                      >
+                        <div className="flex gap-4">
+                          {v.size && <span>Taille: {v.size}</span>}
+                          {v.color && <span>Couleur: {v.color}</span>}
+                          {!v.size && !v.color && <span>Base</span>}
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)] flex items-center gap-4">
+                          <span>Stock: {v.stock}</span>
+                          {(v.barcode || v.shortId) && (
+                            <span className="bg-[var(--bg-alt)] px-2 py-1 rounded-sm border border-[var(--border-soft)]">
+                              {v.shortId || v.barcode}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-red-500">Aucune variante disponible pour ce produit.</p>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -239,7 +264,7 @@ export function CaisseSystem() {
         <div className="flex-1 flex flex-col xl:border-r border-b xl:border-b-0 border-[var(--border-soft)] h-[60vh] xl:h-auto">
           <div className="relative border-b border-[var(--border-soft)]">
             <Search size={16} className="absolute left-6 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-            <input type="text" placeholder="Rechercher par nom ou catégorie..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full pl-14 pr-6 py-5 text-sm outline-none bg-transparent" />
+            <input type="text" placeholder="Recherche (Nom, Code-barres, ID court)..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full pl-14 pr-6 py-5 text-sm outline-none bg-transparent" />
           </div>
           
           <div className="flex items-center justify-between px-6 py-3 bg-[var(--bg-alt)] border-b border-[var(--border-soft)]">
@@ -250,22 +275,33 @@ export function CaisseSystem() {
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 overflow-y-auto p-4 gap-4 bg-[var(--bg-alt)]">
-            {results.map((p) => (
+            {results.map((p) => {
+              const imageUrl = p.images?.[0] || p.image;
+              const totalStock = p.variants?.reduce((acc, v) => acc + v.stock, 0) ?? 0;
+              return (
               <button key={p.id} onClick={() => handleProductClick(p)} className={`text-left bg-white rounded-sm shadow-sm border border-transparent hover:border-[var(--border-soft)] transition-all overflow-hidden flex flex-col ${posCart.find(c => c.product.id === p.id) ? 'ring-2 ring-black' : ''}`}>
                 <div className="relative h-32 w-full bg-[var(--bg-alt)] flex items-center justify-center">
-                  {p.image ? (
-                    <Image src={p.image} alt={p.name} fill className="object-cover" />
+                  {imageUrl ? (
+                    <Image src={imageUrl} alt={p.name} fill className="object-cover" />
                   ) : (
                     <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-widest px-2 text-center">Sans<br/>Image</span>
+                  )}
+                  {totalStock === 0 && p.sizeType !== 'NONE' && (
+                    <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+                      <span className="bg-white px-2 py-1 text-[8px] tracking-widest uppercase font-medium rounded-xs shadow-sm">Épuisé</span>
+                    </div>
                   )}
                 </div>
                 <div className="p-3">
                   <p className="text-[10px] font-medium tracking-widest uppercase text-[var(--text-muted)] mb-1">{p.category}</p>
                   <p className="text-xs font-medium leading-snug line-clamp-1">{p.name}</p>
-                  <p className="font-medium text-sm mt-2">{p.price.toFixed(2)} €</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="font-medium text-sm">{p.price.toFixed(2)} €</p>
+                    {p.shortId && <p className="text-[9px] bg-[var(--bg-alt)] border border-[var(--border-soft)] px-1.5 py-0.5 rounded-sm">{p.shortId}</p>}
+                  </div>
                 </div>
               </button>
-            ))}
+            )})}
           </div>
         </div>
 
@@ -284,29 +320,36 @@ export function CaisseSystem() {
               </div>
             ) : (
               <ul className="divide-y divide-[var(--border-soft)]">
-                {posCart.map(i => (
-                  <li key={i.product.id} className="flex gap-4 p-5 hover:bg-[var(--bg-alt)] transition-colors">
+                {posCart.map((i, idx) => {
+                  const imageUrl = i.product.images?.[0] || i.product.image;
+                  return (
+                  <li key={`${i.product.id}-${i.variantId || idx}`} className="flex gap-4 p-5 hover:bg-[var(--bg-alt)] transition-colors">
                     <div className="w-12 h-16 relative flex-shrink-0 rounded-xs overflow-hidden bg-[var(--bg-alt)] flex items-center justify-center text-center">
-                      {i.product.image ? (
-                        <Image src={i.product.image} alt="" fill className="object-cover" />
+                      {imageUrl ? (
+                        <Image src={imageUrl} alt="" fill className="object-cover" />
                       ) : (
                         <span className="text-[7px] text-[var(--text-muted)] uppercase tracking-widest px-1">Sans Image</span>
                       )}
                     </div>
                     <div className="flex-1 flex flex-col justify-center">
                       <p className="text-xs font-medium">{i.product.name}</p>
-                      {i.size && <p className="text-[10px] tracking-widest uppercase text-[var(--text-muted)] mt-1">Taille: {i.size}</p>}
+                      {(i.size || i.color) && (
+                        <p className="text-[9px] tracking-widest uppercase text-[var(--text-muted)] mt-1">
+                          {i.color && <span>Couleur: {i.color} </span>}
+                          {i.size && <span>{i.color ? '• ' : ''}Taille: {i.size}</span>}
+                        </p>
+                      )}
                       <p className="text-sm font-medium mt-1">{i.product.price.toFixed(2)} €</p>
                     </div>
                     <div className="flex flex-col items-end justify-center gap-2">
                       <div className="flex items-center border border-[var(--border-soft)] rounded-sm bg-white overflow-hidden">
-                        <button onClick={() => changeQty(i.product.id, i.size, -1)} className="p-1.5 hover:bg-[var(--bg-alt)] transition-colors"><Minus size={12} /></button>
+                        <button onClick={() => changeQty(i.product.id, i.variantId, -1)} className="p-1.5 hover:bg-[var(--bg-alt)] transition-colors"><Minus size={12} /></button>
                         <span className="text-xs font-medium w-6 text-center">{i.quantity}</span>
-                        <button onClick={() => changeQty(i.product.id, i.size, 1)} className="p-1.5 hover:bg-[var(--bg-alt)] transition-colors"><Plus size={12} /></button>
+                        <button onClick={() => changeQty(i.product.id, i.variantId, 1)} className="p-1.5 hover:bg-[var(--bg-alt)] transition-colors"><Plus size={12} /></button>
                       </div>
                     </div>
                   </li>
-                ))}
+                )})}
                 {freeItems.map(fi => (
                   <li key={fi.id} className="flex gap-4 p-5 bg-[var(--bg-alt)]">
                     <div className="w-12 h-16 flex items-center justify-center border border-[var(--border-soft)] border-dashed rounded-xs bg-white text-[var(--text-muted)]"><Tag size={16} /></div>

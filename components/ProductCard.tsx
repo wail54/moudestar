@@ -5,16 +5,17 @@ import Link from 'next/link';
 import { Product } from '@/store/useStore';
 
 export function ProductCard({ product }: { product: Product }) {
-  const totalStock = product.stock ? Object.values(product.stock).reduce((a, b) => a + b, 0) : null;
-  const isOos = totalStock !== null && totalStock === 0;
+  const totalStock = product.variants?.reduce((acc, v) => acc + v.stock, 0) ?? 0;
+  const isOos = product.sizeType !== 'NONE' && product.variants?.length > 0 && totalStock === 0;
+  const imageUrl = product.images?.[0] || product.image;
 
   return (
     <Link href={`/boutique/${product.id}`} className="block group w-full">
       <div className={`flex flex-col gap-4 ${isOos ? 'opacity-60' : ''}`}>
         <div className="relative aspect-[3/4] bg-white border border-[var(--border-soft)] overflow-hidden rounded-sm flex items-center justify-center">
-          {product.image ? (
+          {imageUrl ? (
             <Image
-              src={product.image} alt={product.name} fill
+              src={imageUrl} alt={product.name} fill
               className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               sizes="(max-width: 640px) 50vw, 25vw"
             />

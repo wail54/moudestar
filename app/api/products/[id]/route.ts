@@ -8,30 +8,79 @@ export async function PATCH(req: Request, { params }: Params) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const { name, description, price, image, category, featured, stock } = body;
+    const { name, description, price, images, category, featured, sizeType, barcode, shortId, variants } = body;
 
-    const data: Record<string, unknown> = {};
+    const data: Record<string, any> = {};
     if (name !== undefined) data.name = name;
     if (description !== undefined) data.description = description;
     if (price !== undefined) data.price = Number(price);
-    if (image !== undefined) data.image = image;
+    if (images !== undefined) data.images = images;
     if (category !== undefined) data.category = category;
     if (featured !== undefined) data.featured = featured;
-    if (stock !== undefined) {
-      data.stockS = stock.S ?? 0;
-      data.stockM = stock.M ?? 0;
-      data.stockL = stock.L ?? 0;
-      data.stockXL = stock.XL ?? 0;
-    }
+    if (sizeType !== undefined) data.sizeType = sizeType;
+    if (barcode !== undefined) data.barcode = barcode || null;
+    if (shortId !== undefined) data.shortId = shortId || null;
 
+    // Mise à jour du produit
     const product = await prisma.product.update({
       where: { id },
       data,
     });
 
-    return NextResponse.json(product);
-  } catch (error) {
+    // Mise à jour des variantes si fournies
+    if (variants && Array.isArray(variants)) {
+      // Pour faire simple et robuste : on supprime les anciennes variantes non incluses,
+      // on met à jour les existantes et on crée les nouvelles.
+      const incomingVariantIds = variants.map(v => v.id).filter(Boolean);
+      
+      // 1. Supprimer les variantes qui ne sont plus là
+      await prisma.productVariant.deleteMany({
+        where: {
+          productId: id,
+          id: { notIn: incomingVariantIds }
+        }
+      });
+
+      // 2. Créer ou mettre à jour les variantes
+      for (const v of variants) {
+        if (v.id) {
+          await prisma.productVariant.update({
+            where: { id: v.id },
+            data: {
+              color: v.color || null,
+              size: v.size || null,
+              stock: Number(v.stock) || 0,
+              barcode: v.barcode || null,
+              shortId: v.shortId || null,
+            }
+          });
+        } else {
+          await prisma.productVariant.create({
+            data: {
+              productId: id,
+              color: v.color || null,
+              size: v.size || null,
+              stock: Number(v.stock) || 0,
+              barcode: v.barcode || null,
+              shortId: v.shortId || null,
+            }
+          });
+        }
+      }
+    }
+
+    // Récupérer le produit complet mis à jour
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id },
+      include: { variants: true }
+    });
+
+    return NextResponse.json(updatedProduct);
+  } catch (error: any) {
     console.error('[PATCH /api/products/:id]', error);
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: 'Un code-barres ou ID court est déjà utilisé.' }, { status: 400 });
+    }
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }

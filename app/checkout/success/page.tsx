@@ -10,19 +10,24 @@ function SuccessContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const searchParams = useSearchParams();
   const sessionId = searchParams?.get('session_id');
+  const storeCreditCode = searchParams?.get('sc');
+  const shippingAddress = searchParams?.get('addr');
   const clearCart = useStore((s) => s.clearCart);
   const cart = useStore((s) => s.cart);
 
   useEffect(() => {
     if (sessionId) {
-      // In a real app, you would verify the session_id on the server, create the order in DB, etc.
-      // For this MVP, we will just call our existing order creation endpoint using the current cart in state
-      // This assumes the user comes back to this device/browser.
       if (cart.length > 0) {
         fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: cart, discountAmount: 0, source: 'en_ligne' }),
+          body: JSON.stringify({ 
+            items: cart, 
+            source: 'en_ligne', 
+            sessionId,
+            storeCreditCode: storeCreditCode || undefined,
+            shippingAddress: shippingAddress || undefined
+          }),
         })
           .then((res) => {
             if (res.ok) {

@@ -4,6 +4,7 @@ import { X, Plus, Minus, ShoppingBag, Trash2 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
 import Image from 'next/image';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 
@@ -85,11 +86,13 @@ export function CartDrawer() {
                 </div>
               ) : (
                 <div className="divide-y divide-[var(--border-soft)]">
-                  {cart.map((item) => (
-                    <div key={`${item.product.id}-${item.size}`} className="flex gap-5 p-6 bg-white">
+                  {cart.map((item) => {
+                    const imageUrl = item.product.images?.[0] || item.product.image;
+                    return (
+                    <div key={`${item.product.id}-${item.variantId || 'base'}`} className="flex gap-5 p-6 bg-white">
                       <div className="relative w-20 aspect-[3/4] bg-[var(--bg-alt)] flex-shrink-0 rounded-xs overflow-hidden flex items-center justify-center text-center">
-                        {item.product.image ? (
-                          <Image src={item.product.image} alt={item.product.name} fill className="object-cover" sizes="80px" />
+                        {imageUrl ? (
+                          <Image src={imageUrl} alt={item.product.name} fill className="object-cover" sizes="80px" />
                         ) : (
                           <span className="text-[8px] text-[var(--text-muted)] uppercase tracking-widest px-2">Sans<br/>Image</span>
                         )}
@@ -97,22 +100,27 @@ export function CartDrawer() {
                       <div className="flex-1 min-w-0 flex flex-col">
                         <p className="text-[9px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-1">{item.product.category}</p>
                         <p className="text-sm font-medium leading-snug">{item.product.name}</p>
-                        {item.size && <p className="text-[10px] tracking-widest font-medium uppercase text-[var(--text-muted)] mt-1">Taille: {item.size}</p>}
+                        {(item.size || item.color) && (
+                          <p className="text-[10px] tracking-widest font-medium uppercase text-[var(--text-muted)] mt-1">
+                            {item.color && <span>Couleur: {item.color} </span>}
+                            {item.size && <span>{item.color ? '• ' : ''}Taille: {item.size}</span>}
+                          </p>
+                        )}
                         
                         <div className="mt-auto flex items-end justify-between">
                           <p className="font-medium text-sm">{item.product.price.toFixed(2)} €</p>
                           <div className="flex items-center gap-4">
                             <div className="flex items-center border border-[var(--border-soft)] rounded-sm overflow-hidden">
-                              <button onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.size)} className="p-2 bg-[var(--bg-alt)] hover:bg-black hover:text-white transition-colors"><Minus size={10} /></button>
+                              <button onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.variantId)} className="p-2 bg-[var(--bg-alt)] hover:bg-black hover:text-white transition-colors"><Minus size={10} /></button>
                               <span className="text-xs font-medium w-8 text-center">{item.quantity}</span>
-                              <button onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.size)} className="p-2 bg-[var(--bg-alt)] hover:bg-black hover:text-white transition-colors"><Plus size={10} /></button>
+                              <button onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.variantId)} className="p-2 bg-[var(--bg-alt)] hover:bg-black hover:text-white transition-colors"><Plus size={10} /></button>
                             </div>
-                            <button onClick={() => removeFromCart(item.product.id, item.size)} className="p-2 text-[var(--text-muted)] hover:text-red-500 bg-[var(--bg-alt)] rounded-sm transition-colors"><Trash2 size={14} /></button>
+                            <button onClick={() => removeFromCart(item.product.id, item.variantId)} className="p-2 text-[var(--text-muted)] hover:text-red-500 bg-[var(--bg-alt)] rounded-sm transition-colors"><Trash2 size={14} /></button>
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               )}
             </div>
@@ -127,9 +135,9 @@ export function CartDrawer() {
                     <span>Total TTC</span><span>{total.toFixed(2)} €</span>
                   </div>
                 </div>
-                <button onClick={handleCheckout} disabled={isCheckingOut} className="btn-primary w-full py-4 text-xs rounded-sm disabled:opacity-50">
-                  {isCheckingOut ? 'Redirection vers Stripe...' : 'Valider la commande'}
-                </button>
+                <Link href="/checkout" onClick={closeCart} className="btn-primary w-full py-4 text-xs rounded-sm text-center block">
+                  Procéder à la commande
+                </Link>
               </div>
             )}
           </motion.aside>

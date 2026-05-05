@@ -5,7 +5,10 @@ import { prisma } from '@/lib/prisma';
 export async function GET() {
   try {
     const products = await prisma.product.findMany({
-      orderBy: { createdAt: 'asc' },
+      include: {
+        variants: true,
+      },
+      orderBy: { createdAt: 'desc' },
     });
     return NextResponse.json(products);
   } catch (error) {
@@ -18,7 +21,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, description, price, image, category, featured, stock } = body;
+    const { name, description, price, images, category, featured, sizeType, barcode, shortId, variants } = body;
 
     if (!name || price == null) {
       return NextResponse.json({ error: 'Champs obligatoires manquants' }, { status: 400 });
@@ -29,19 +32,33 @@ export async function POST(req: Request) {
         name,
         description: description ?? '',
         price: Number(price),
-        image: image ?? '',
+        images: images ?? [],
         category,
         featured: featured ?? false,
-        stockS: stock?.S ?? 0,
-        stockM: stock?.M ?? 0,
-        stockL: stock?.L ?? 0,
-        stockXL: stock?.XL ?? 0,
+        sizeType: sizeType ?? 'NONE',
+        barcode: barcode || null,
+        shortId: shortId || null,
+        variants: {
+          create: variants?.map((v: any) => ({
+            color: v.color || null,
+            size: v.size || null,
+            stock: Number(v.stock) || 0,
+            barcode: v.barcode || null,
+            shortId: v.shortId || null,
+          })) || [],
+        },
+      },
+      include: {
+        variants: true,
       },
     });
 
     return NextResponse.json(product, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('[POST /api/products]', error);
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: 'Un code-barres ou ID court est déjà utilisé.' }, { status: 400 });
+    }
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
