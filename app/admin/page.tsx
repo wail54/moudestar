@@ -33,6 +33,8 @@ interface Order {
   total: number;
   status: string;
   source: string;
+  shippingAddress?: string;
+  profile?: { email: string; role: string };
 }
 
 const childFade = {
@@ -260,7 +262,10 @@ export default function AdminPage() {
                         <div className="flex flex-wrap items-center justify-between pb-4 border-b border-[var(--border-soft)] mb-6 gap-4">
                           <div>
                             <p className="font-mono text-xs font-medium mb-1">#{order.id.slice(-8)}</p>
-                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest">{new Date(order.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
+                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest mb-1">{new Date(order.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
+                            {order.profile?.email && (
+                              <p className="text-[10px] text-blue-600 uppercase tracking-widest">{order.profile.email}</p>
+                            )}
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="flex items-center gap-1.5 text-[9px] tracking-widest uppercase bg-[var(--bg-alt)] px-3 py-1.5 rounded-sm font-medium">
@@ -278,6 +283,12 @@ export default function AdminPage() {
                             <button onClick={() => setDeleteId(order.id)} className="text-[var(--text-muted)] hover:text-red-600 transition-colors p-2 bg-[var(--bg-alt)] rounded-sm"><Trash2 size={14} /></button>
                           </div>
                         </div>
+                        {order.shippingAddress && (
+                          <div className="mb-6 p-4 bg-[var(--bg-alt)] rounded-sm border border-[var(--border-soft)]">
+                            <p className="text-[10px] uppercase tracking-widest font-medium text-[var(--text-muted)] mb-2">Adresse de livraison</p>
+                            <p className="text-sm">{order.shippingAddress}</p>
+                          </div>
+                        )}
                         <div className="flex flex-col gap-4">
                           {order.items.map((item, idx) => (
                             <div key={idx} className="flex gap-4 items-center">
