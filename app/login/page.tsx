@@ -22,12 +22,12 @@ function AuthForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Redirect if already logged in as admin
+  // Redirect if already logged in
   useEffect(() => {
     const supabase = createClient();
     if (!supabase) return;
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.user_metadata?.role === 'ADMIN') {
+      if (user) {
         router.replace(redirectTo);
       }
     });
@@ -72,8 +72,9 @@ function AuthForm() {
     if (role === 'ADMIN') {
       router.replace(redirectTo);
     } else {
-      // Utilisateur connecté → boutique (changement visible)
-      router.replace('/boutique');
+      // Utilisateur connecté → redirection vers redirectTo si défini, sinon boutique
+      const dest = searchParams.get('redirectTo');
+      router.replace(dest || '/boutique');
     }
   };
 

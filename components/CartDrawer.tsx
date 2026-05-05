@@ -5,8 +5,10 @@ import { useStore } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { createClient } from '@/lib/supabase/client';
 
 export function CartDrawer() {
   const isOpen = useStore((s) => s.isCartOpen);
@@ -17,26 +19,22 @@ export function CartDrawer() {
   const updateQuantity = useStore((s) => s.updateQuantity);
   const { showToast } = useToast();
 
+  const router = useRouter();
+  const supabase = createClient();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  const placeOrder = async () => {
+  const handleCheckout = async () => {
     if (!cart.length) return;
     setIsCheckingOut(true);
     try {
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: cart, discountAmount: 0 }),
-      });
-      const data = await res.json();
-      if (res.ok && data.url) {
-        window.location.href = data.url;
+      const { data: { session } } = await supabase.auth.getSession();
+      closeCart();
+      if (!session) {
+        router.push('/login?redirectTo=/checkout');
       } else {
-        showToast(data.error || 'Erreur lors du paiement', 'error');
-        setIsCheckingOut(false);
+        router.push('/checkout');
       }
-    } catch (err) {
-      showToast('Erreur réseau', 'error');
+    } finally {
       setIsCheckingOut(false);
     }
   };
@@ -44,10 +42,6 @@ export function CartDrawer() {
   const subtotal = cart.reduce((s, i) => s + i.product.price * i.quantity, 0);
   const tva = subtotal * 0.2;
   const total = subtotal + tva;
-
-  const handleCheckout = () => {
-    placeOrder();
-  };
 
   return (
     <>
@@ -135,9 +129,13 @@ export function CartDrawer() {
                     <span>Total TTC</span><span>{total.toFixed(2)} €</span>
                   </div>
                 </div>
-                <Link href="/checkout" onClick={closeCart} className="btn-primary w-full py-4 text-xs rounded-sm text-center block">
-                  Procéder à la commande
-                </Link>
+                <button
+                  onClick={handleCheckout}
+                  disabled={isCheckingOut}
+                  className="btn-primary w-full py-4 text-xs rounded-sm text-center block disabled:opacity-50"
+                >
+                  {isCheckingOut ? 'Chargement...' : 'Procéder à la commande'}
+                </button>
               </div>
             )}
           </motion.aside>
