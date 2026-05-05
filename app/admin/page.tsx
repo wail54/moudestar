@@ -11,6 +11,7 @@ import {
 import { Product, toFrontendProduct, ProductVariant, SizeType } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
 import { CaisseSystem } from '@/components/CaisseSystem';
+import { ImageUploader } from '@/components/ImageUploader';
 
 type Tab = 'orders' | 'products' | 'add' | 'caisse';
 type OrderStatus = 'En attente' | 'Confirmée' | 'Expédiée' | 'Terminée';
@@ -285,25 +286,11 @@ export default function AdminPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Images (URLs)</label>
-                  <div className="flex gap-2 mb-2">
-                    <input type="text" id="edit-new-image" placeholder="Ajouter une URL d'image" className="flex-1 px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
-                    <button type="button" onClick={() => {
-                      const input = document.getElementById('edit-new-image') as HTMLInputElement;
-                      if (input.value) {
-                        setEditingProduct({...editingProduct, images: [...(editingProduct.images||[]), input.value]});
-                        input.value = '';
-                      }
-                    }} className="px-4 py-3 bg-black text-white text-xs uppercase tracking-widest rounded-sm"><PlusCircle size={16}/></button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {editingProduct.images?.map((img, idx) => (
-                      <div key={idx} className="relative w-16 h-16 border border-[var(--border-soft)] rounded-sm overflow-hidden group">
-                        <Image src={img} alt="" fill className="object-cover" />
-                        <button type="button" onClick={() => setEditingProduct({...editingProduct, images: editingProduct.images.filter((_, i) => i !== idx)})} className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16}/></button>
-                      </div>
-                    ))}
-                  </div>
+                  <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Images</label>
+                  <ImageUploader
+                    images={editingProduct.images || []}
+                    onChange={(imgs) => setEditingProduct({ ...editingProduct, images: imgs })}
+                  />
                 </div>
 
                 <div>
@@ -627,23 +614,11 @@ export default function AdminPage() {
 
                   {/* Galerie d'images */}
                   <div className="pt-6 border-t border-[var(--border-soft)]">
-                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-4">Galerie d'images</label>
-                    <div className="flex flex-col gap-4">
-                      <div className="flex gap-2">
-                        <input type="url" value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} placeholder="https://exemple.com/image.jpg" className="flex-1 px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
-                        <button onClick={handleAddImage} className="px-6 py-3 bg-black text-white text-xs font-medium uppercase tracking-widest rounded-sm hover:bg-black/90">Ajouter</button>
-                      </div>
-                      {form.images.length > 0 && (
-                        <div className="flex flex-wrap gap-4 mt-2">
-                          {form.images.map((img, idx) => (
-                            <div key={idx} className="relative w-24 h-24 border border-[var(--border-soft)] rounded-sm overflow-hidden group">
-                              <Image src={img} alt={`Img ${idx}`} fill className="object-cover" />
-                              <button type="button" onClick={() => handleRemoveImage(idx)} className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-4">Galerie d&apos;images</label>
+                    <ImageUploader
+                      images={form.images}
+                      onChange={(imgs) => setForm({ ...form, images: imgs })}
+                    />
                   </div>
 
                   {/* Variantes */}

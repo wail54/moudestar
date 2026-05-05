@@ -120,10 +120,12 @@ export async function POST(req: Request) {
       mode: 'payment',
       success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}${encodedAddr ? `&addr=${encodedAddr}` : ''}${encodedSc ? `&sc=${encodedSc}` : ''}`,
       cancel_url: `${origin}/checkout/cancel`,
+      client_reference_id: userId || undefined,
       metadata: {
         order_details: JSON.stringify(items.map((i: any) => ({ id: i.product.id, variantId: i.variantId, q: i.quantity }))),
         storeCreditCode: storeCreditCode || '',
         shippingAddress: shippingAddress || '',
+        userId: userId || '',
       },
     };
 

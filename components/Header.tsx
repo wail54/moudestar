@@ -122,12 +122,15 @@ export function Header() {
 
               {/* Utilisateur connecté non-admin */}
               {!isAdmin && userEmail && (
-                <div className="hidden md:flex items-center gap-3">
-                  <span className={`text-[10px] tracking-[0.12em] font-medium truncate max-w-[140px] ${
-                    onHero ? 'text-white/70' : 'text-[var(--text-muted)]'
-                  }`}>
-                    {userEmail}
-                  </span>
+                <div className="hidden md:flex items-center gap-4">
+                  <Link
+                    href="/account"
+                    className={`text-[10px] tracking-[0.15em] uppercase font-medium transition-colors ${
+                      onHero ? 'text-white/80 hover:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                    }`}
+                  >
+                    Mon Compte
+                  </Link>
                   <button
                     onClick={handleLogout}
                     title="Déconnexion"
@@ -166,13 +169,18 @@ export function Header() {
               <nav className="flex-1 flex flex-col p-4">
                 {[
                   ...links,
-                  ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : [{ href: '/login', label: 'Connexion' }])
+                  ...(isAdmin
+                    ? [{ href: '/admin', label: 'Admin' }]
+                    : userEmail
+                      ? [{ href: '/account', label: 'Mon Compte' }]
+                      : [{ href: '/login', label: 'Connexion' }]
+                  )
                 ].map((l) => (
                   <Link key={l.href} href={l.href} onClick={() => setMobileOpen(false)} className="px-4 py-4 text-sm font-medium tracking-wide border-b border-[var(--border-soft)] hover:bg-[var(--bg-alt)] transition-colors">
                     {l.label}
                   </Link>
                 ))}
-                {isAdmin && (
+                {(isAdmin || userEmail) && (
                   <button onClick={() => { handleLogout(); setMobileOpen(false); }} className="px-4 py-4 text-sm font-medium tracking-wide text-left text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2">
                     <LogOut size={14} /> Déconnexion
                   </button>
