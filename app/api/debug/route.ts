@@ -2,8 +2,39 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const syncOrderId = searchParams.get('syncOrderId');
+    const syncSessionId = searchParams.get('syncSessionId');
+
+    if (syncOrderId && syncSessionId && process.env.STRIPE_SECRET_KEY) {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' as any });
+      const session: any = await stripe.checkout.sessions.retrieve(syncSessionId);
+      let addrInfo = session.shipping_details?.address || session.customer_details?.address;
+      let nameInfo = session.shipping_details?.name || session.customer_details?.name || session.customer_details?.email || '';
+      
+      let shippingAddress = null;
+      if (addrInfo) {
+        shippingAddress = [
+          nameInfo,
+          addrInfo.line1,
+          addrInfo.line2,
+          `${addrInfo.postal_code} ${addrInfo.city}`,
+          addrInfo.country
+        ].filter(Boolean).join(', ');
+      }
+      
+      if (shippingAddress) {
+        await prisma.order.update({
+          where: { id: syncOrderId },
+          data: { shippingAddress }
+        });
+        return NextResponse.json({ success: true, shippingAddress });
+      }
+      return NextResponse.json({ error: 'No address in session', session });
+    }
+
     const orders = await prisma.order.findMany({
       orderBy: { date: 'desc' },
       take: 5,
