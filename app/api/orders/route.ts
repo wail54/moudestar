@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 
 function getSupabase() {
@@ -37,7 +38,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { items, discountAmount = 0, source = 'en_ligne' } = body;
+    const { items, discountAmount = 0, source = 'en_ligne', sessionId } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: 'Panier vide' }, { status: 400 });
@@ -45,6 +46,26 @@ export async function POST(req: Request) {
 
     // Récupérer l'utilisateur connecté si présent
     const userId = await getUserIdFromRequest(req);
+
+    let shippingAddress = null;
+    if (sessionId) {
+      try {
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' as any });
+        const session: any = await stripe.checkout.sessions.retrieve(sessionId);
+        if (session.shipping_details?.address) {
+          const addr = session.shipping_details.address;
+          shippingAddress = [
+            session.shipping_details.name,
+            addr.line1,
+            addr.line2,
+            `${addr.postal_code} ${addr.city}`,
+            addr.country
+          ].filter(Boolean).join(', ');
+        }
+      } catch (err) {
+        console.error('[STRIPE] Erreur récupération session:', err);
+      }
+    }
 
     const TVA_RATE = 0.20;
     const subtotal: number = items.reduce(
@@ -60,6 +81,7 @@ export async function POST(req: Request) {
     const order = await prisma.order.create({
       data: {
         userId: userId ?? undefined,
+        shippingAddress,
         subtotal,
         discount: discountAmount,
         tva,

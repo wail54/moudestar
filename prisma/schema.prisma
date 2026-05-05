@@ -39,6 +39,7 @@ model Order {
   total     Float
   status    String      @default("En attente")
   source    String      @default("en_ligne")
+  shippingAddress String?
   items     OrderItem[]
   profile   Profile?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
