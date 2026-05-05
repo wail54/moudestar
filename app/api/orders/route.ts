@@ -52,18 +52,21 @@ export async function POST(req: Request) {
       try {
         const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' as any });
         const session: any = await stripe.checkout.sessions.retrieve(sessionId);
-        if (session.shipping_details?.address) {
-          const addr = session.shipping_details.address;
+        
+        let addrInfo = session.shipping_details?.address || session.customer_details?.address;
+        let nameInfo = session.shipping_details?.name || session.customer_details?.name || session.customer_details?.email || '';
+
+        if (addrInfo) {
           shippingAddress = [
-            session.shipping_details.name,
-            addr.line1,
-            addr.line2,
-            `${addr.postal_code} ${addr.city}`,
-            addr.country
+            nameInfo,
+            addrInfo.line1,
+            addrInfo.line2,
+            `${addrInfo.postal_code} ${addrInfo.city}`,
+            addrInfo.country
           ].filter(Boolean).join(', ');
         }
-      } catch (err) {
-        console.error('[STRIPE] Erreur récupération session:', err);
+      } catch (err: any) {
+        console.error('[STRIPE] Erreur récupération session:', err.message || err);
       }
     }
 
