@@ -71,6 +71,12 @@ export async function POST(req: Request) {
       },
     });
 
+    // Mettre à jour le statut de la commande pour que l'admin le voie immédiatement
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'Retour demandé' },
+    });
+
     return NextResponse.json(request, { status: 201 });
   } catch (error) {
     console.error('[POST /api/refunds]', error);

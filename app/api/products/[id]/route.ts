@@ -89,10 +89,25 @@ export async function PATCH(req: Request, { params }: Params) {
 export async function DELETE(_req: Request, { params }: Params) {
   try {
     const { id } = await params;
+
+    // 1. Supprimer les paniers sauvegardés liés
+    await prisma.savedCart.deleteMany({ where: { productId: id } });
+
+    // 2. Supprimer les variantes (FK sur ProductVariant → Product est Cascade)
+    await prisma.productVariant.deleteMany({ where: { productId: id } });
+
+    // 3. Tenter la suppression du produit
     await prisma.product.delete({ where: { id } });
+
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('[DELETE /api/products/:id]', error);
+    // FK constraint P2003 → OrderItem.productId encore lié
+    if (error.code === 'P2003' || error.code === 'P2014') {
+      return NextResponse.json({
+        error: 'Ce produit est référencé dans des commandes existantes. Désactivez-le plutôt que de le supprimer.',
+      }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }

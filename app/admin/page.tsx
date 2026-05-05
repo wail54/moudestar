@@ -14,8 +14,8 @@ import { CaisseSystem } from '@/components/CaisseSystem';
 import { ImageUploader } from '@/components/ImageUploader';
 
 type Tab = 'orders' | 'products' | 'add' | 'caisse';
-type OrderStatus = 'En attente' | 'Confirmée' | 'Expédiée' | 'Terminée';
-const STATUS_OPTIONS: OrderStatus[] = ['En attente', 'Confirmée', 'Expédiée', 'Terminée'];
+type OrderStatus = 'En attente' | 'Confirmée' | 'Expédiée' | 'Terminée' | 'Retour demandé';
+const STATUS_OPTIONS: OrderStatus[] = ['En attente', 'Confirmée', 'Expédiée', 'Terminée', 'Retour demandé'];
 
 interface OrderItem {
   id: string;
@@ -178,7 +178,13 @@ export default function AdminPage() {
 
   const handleDeleteProduct = async (id: string) => {
     const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-    if (res.ok) { await loadProducts(); showToast('Produit supprimé', 'success'); }
+    if (res.ok) {
+      await loadProducts();
+      showToast('Produit supprimé', 'success');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Erreur lors de la suppression', 'error');
+    }
   };
 
   const handleDeleteOrder = async (id: string) => {
@@ -406,6 +412,11 @@ export default function AdminPage() {
                                 <p className="font-mono text-xs font-medium mb-1">#{order.id.slice(-8)}</p>
                                 <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest mb-1">{new Date(order.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
                                 {order.profile?.email && <p className="text-[10px] text-blue-600 uppercase tracking-widest">{order.profile.email}</p>}
+                                {order.status === 'Retour demandé' && (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-xs bg-red-100 text-red-600 border border-red-200">
+                                    ⚠ Retour demandé
+                                  </span>
+                                )}
                                 {order.refundStatus && <span className="text-[9px] font-medium uppercase tracking-widest px-2 py-0.5 rounded-xs bg-orange-100 text-orange-600">{order.refundStatus === 'full' ? 'Remboursé' : 'Remb. partiel'}</span>}
                               </div>
                               <div className="flex items-center gap-3">
