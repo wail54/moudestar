@@ -18,6 +18,7 @@ export function ProductCard({ product }: { product: Product }) {
               src={imageUrl} alt={product.name} fill
               className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               sizes="(max-width: 640px) 50vw, 25vw"
+              unoptimized
             />
           ) : (
             <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest">Aperçu indisponible</span>

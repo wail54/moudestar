@@ -280,69 +280,93 @@ export default function AdminPage() {
                 <button onClick={() => setEditingProduct(null)} className="text-[var(--text-muted)] hover:text-black"><X size={20} /></button>
               </div>
               <form onSubmit={handleEditSubmit} className="flex flex-col gap-5">
+
+                {/* ── Infos de base ── */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+                  <div className="md:col-span-2">
                     <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Nom</label>
                     <input type="text" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Description</label>
+                    <textarea rows={2} value={editingProduct.description || ''} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm resize-none border border-[var(--border-soft)] focus:border-black transition-colors" />
                   </div>
                   <div>
                     <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Prix (€)</label>
                     <input type="number" step="0.01" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)||0})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
                   </div>
                   <div>
-                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Code-barres (10 chif.)</label>
-                    <input type="text" maxLength={10} value={editingProduct.barcode || ''} onChange={e => setEditingProduct({...editingProduct, barcode: e.target.value || null})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">ID Court (4 chif.)</label>
-                    <input type="text" maxLength={4} value={editingProduct.shortId || ''} onChange={e => setEditingProduct({...editingProduct, shortId: e.target.value || null})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
-                  </div>
-                  <div className="md:col-span-2 flex items-center">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" checked={editingProduct.featured ?? false} onChange={e => setEditingProduct({...editingProduct, featured: e.target.checked})} className="w-4 h-4 text-black border-[var(--border-soft)] rounded-xs" />
-                      <span className="text-[10px] tracking-widest uppercase font-medium text-black">Produit mis en avant</span>
-                    </label>
+                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Catégorie</label>
+                    <select value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors">
+                      {['Vêtements', 'Accessoires', 'Chaussures'].map(c => <option key={c}>{c}</option>)}
+                    </select>
                   </div>
                 </div>
-                
-                <div>
-                  <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Images</label>
+
+                {/* ── Identification caisse ── */}
+                <div className="pt-4 border-t border-[var(--border-soft)]">
+                  <p className="text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-3">Identification caisse</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] uppercase font-medium text-black mb-2">Code-barres (10 chif.)</label>
+                      <input type="text" maxLength={10} value={editingProduct.barcode || ''} onChange={e => setEditingProduct({...editingProduct, barcode: e.target.value || null})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" placeholder="0000000000" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-medium text-black mb-2">ID Court (4 chif.)</label>
+                      <input type="text" maxLength={4} value={editingProduct.shortId || ''} onChange={e => setEditingProduct({...editingProduct, shortId: e.target.value || null})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" placeholder="0000" />
+                    </div>
+                    <div className="flex items-end pb-1">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" checked={editingProduct.featured ?? false} onChange={e => setEditingProduct({...editingProduct, featured: e.target.checked})} className="w-4 h-4 accent-black border-[var(--border-soft)]" />
+                        <span className="text-[10px] tracking-widest uppercase font-medium text-black leading-tight">Mis en avant<br/><span className="text-[var(--text-muted)] normal-case font-normal">Affiché sur la page d&apos;accueil</span></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Images ── */}
+                <div className="pt-4 border-t border-[var(--border-soft)]">
+                  <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-3">Images</label>
                   <ImageUploader
                     images={editingProduct.images || []}
                     onChange={(imgs) => setEditingProduct({ ...editingProduct, images: imgs })}
                   />
                 </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-2">
+                {/* ── Variantes ── */}
+                <div className="pt-4 border-t border-[var(--border-soft)]">
+                  <div className="flex justify-between items-center mb-3">
                     <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)]">Variantes & Stock</label>
                     <button type="button" onClick={() => setEditingProduct({...editingProduct, variants: [...editingProduct.variants, { id: '', productId: editingProduct.id, color: '', size: '', stock: 0, barcode: '', shortId: '' }]})} className="text-[10px] uppercase tracking-widest font-medium text-black underline">Ajouter</button>
                   </div>
+                  {editingProduct.variants.length === 0 && (
+                    <p className="text-sm text-[var(--text-muted)] italic">Aucune variante — produit taille unique.</p>
+                  )}
                   {editingProduct.variants.map((v, i) => (
-                    <div key={i} className="flex gap-2 mb-2 items-center">
+                    <div key={i} className="flex gap-2 mb-2 items-center flex-wrap">
                       <input type="text" placeholder="Taille" value={v.size || ''} onChange={e => {
-                        const newV = [...editingProduct.variants]; newV[i].size = e.target.value; setEditingProduct({...editingProduct, variants: newV});
+                        const newV = [...editingProduct.variants]; newV[i] = {...newV[i], size: e.target.value}; setEditingProduct({...editingProduct, variants: newV});
                       }} className="w-16 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
                       <input type="text" placeholder="Couleur" value={v.color || ''} onChange={e => {
-                        const newV = [...editingProduct.variants]; newV[i].color = e.target.value; setEditingProduct({...editingProduct, variants: newV});
+                        const newV = [...editingProduct.variants]; newV[i] = {...newV[i], color: e.target.value}; setEditingProduct({...editingProduct, variants: newV});
                       }} className="w-24 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
-                      <input type="number" placeholder="Stock" value={v.stock} onChange={e => {
-                        const newV = [...editingProduct.variants]; newV[i].stock = parseInt(e.target.value)||0; setEditingProduct({...editingProduct, variants: newV});
+                      <input type="number" placeholder="Stock" value={v.stock} min={0} onChange={e => {
+                        const newV = [...editingProduct.variants]; newV[i] = {...newV[i], stock: parseInt(e.target.value)||0}; setEditingProduct({...editingProduct, variants: newV});
                       }} className="w-20 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
                       <input type="text" placeholder="Code-barres" value={v.barcode || ''} onChange={e => {
-                        const newV = [...editingProduct.variants]; newV[i].barcode = e.target.value; setEditingProduct({...editingProduct, variants: newV});
-                      }} className="w-28 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
-                      <input type="text" placeholder="ID Court" maxLength={4} value={v.shortId || ''} onChange={e => {
-                        const newV = [...editingProduct.variants]; newV[i].shortId = e.target.value; setEditingProduct({...editingProduct, variants: newV});
-                      }} className="w-20 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
+                        const newV = [...editingProduct.variants]; newV[i] = {...newV[i], barcode: e.target.value}; setEditingProduct({...editingProduct, variants: newV});
+                      }} className="flex-1 min-w-[100px] px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
+                      <input type="text" placeholder="ID (4)" maxLength={4} value={v.shortId || ''} onChange={e => {
+                        const newV = [...editingProduct.variants]; newV[i] = {...newV[i], shortId: e.target.value}; setEditingProduct({...editingProduct, variants: newV});
+                      }} className="w-16 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
                       <button type="button" onClick={() => {
                         setEditingProduct({...editingProduct, variants: editingProduct.variants.filter((_, idx) => idx !== i)});
-                      }} className="p-2 text-red-500 hover:bg-red-50 rounded-sm"><Trash2 size={16}/></button>
+                      }} className="p-2 text-red-500 hover:bg-red-50 rounded-sm flex-shrink-0"><Trash2 size={16}/></button>
                     </div>
                   ))}
                 </div>
 
-                <button type="submit" className="mt-4 w-full py-4 bg-black text-white text-xs font-medium uppercase tracking-widest rounded-sm hover:bg-black/90">Sauvegarder</button>
+                <button type="submit" className="mt-2 w-full py-4 bg-black text-white text-xs font-medium uppercase tracking-widest rounded-sm hover:bg-black/90">Sauvegarder</button>
               </form>
             </motion.div>
           </motion.div>
