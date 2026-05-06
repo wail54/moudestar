@@ -9,7 +9,6 @@ import { useToast } from '@/components/Toast';
 import { PosPaymentModal, PaymentMeta } from '@/components/pos/PosPaymentModal';
 import { PosSearchBar } from '@/components/pos/PosSearchBar';
 
-const TVA = 0.20;
 type DiscountType = 'pct' | 'fixed';
 interface FreeItem { id: string; name: string; price: number; }
 
@@ -82,8 +81,7 @@ export function CaisseSystem() {
   }, [discountValue, discountType, subtotal]);
 
   const discounted = subtotal - discountAmt;
-  const tva = discounted * TVA;
-  const total = discounted + tva;
+  const total = discounted; // Prix TTC — pas de TVA ajoutée
   const hasItems = posCart.length > 0 || freeItems.length > 0;
 
   const handleEncaisserClick = () => {
@@ -145,7 +143,7 @@ export function CaisseSystem() {
           <span className="text-3xl">✓</span>
         </div>
         <p className="font-cormorant text-4xl font-light mb-2">Vente Encaissée</p>
-        <p className="text-xs font-medium tracking-widest uppercase text-[var(--text-muted)] mb-6">Total TTC : {total.toFixed(2)} €</p>
+        <p className="text-xs font-medium tracking-widest uppercase text-[var(--text-muted)] mb-6">Total : {total.toFixed(2)} €</p>
         {email && <p className="text-[10px] font-medium text-[var(--text-muted)]">Ticket expédié vers {email}</p>}
       </motion.div>
     );
@@ -357,11 +355,10 @@ export function CaisseSystem() {
 
             <div className="p-6 bg-white">
               <div className="space-y-3 mb-6">
-                <div className="flex justify-between text-xs font-medium text-[var(--text-muted)]"><span>Sous-total HT</span><span>{subtotal.toFixed(2)} €</span></div>
+                <div className="flex justify-between text-xs font-medium text-[var(--text-muted)]"><span>Sous-total</span><span>{subtotal.toFixed(2)} €</span></div>
                 {discountAmt > 0 && <div className="flex justify-between text-xs font-medium text-red-500"><span>Remise</span><span>-{discountAmt.toFixed(2)} €</span></div>}
-                <div className="flex justify-between text-xs font-medium text-[var(--text-muted)]"><span>TVA (20%)</span><span>{tva.toFixed(2)} €</span></div>
                 <div className="flex justify-between pt-4 font-medium text-xl border-t border-[var(--border-soft)]">
-                  <span>Total TTC</span><span>{total.toFixed(2)} €</span>
+                  <span>Total</span><span>{total.toFixed(2)} €</span>
                 </div>
               </div>
               <button onClick={handleEncaisserClick} disabled={!hasItems} className="btn-primary w-full rounded-sm py-4">

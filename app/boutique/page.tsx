@@ -1,57 +1,69 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { Search } from 'lucide-react';
 import { motion, Variants } from 'framer-motion';
 import { Product, toFrontendProduct } from '@/store/useStore';
 import { ProductCard } from '@/components/ProductCard';
+import { useSearchParams } from 'next/navigation';
 
-const CATS = ['Tous', 'Vêtements', 'Accessoires', 'Chaussures'];
+const CATS = ['Tous', 'Homme', 'Femme', 'Mixte', 'Accessoires', 'Chaussures'];
 
 const fadeUp: Variants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export default function BoutiquePage() {
+// Composant interne qui utilise useSearchParams (nécessite Suspense)
+function BoutiqueContent() {
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
-  const [cat, setCat] = useState('Tous');
+
+  // Initialise le filtre depuis le param URL ?category=
+  const [cat, setCat] = useState(() => {
+    const urlCat = searchParams?.get('category');
+    return urlCat && CATS.includes(urlCat) ? urlCat : 'Tous';
+  });
+
+  // Met à jour le filtre si l'URL change (navigation header)
+  useEffect(() => {
+    const urlCat = searchParams?.get('category');
+    if (urlCat && CATS.includes(urlCat)) setCat(urlCat);
+    else if (!urlCat) setCat('Tous');
+  }, [searchParams]);
 
   useEffect(() => {
     fetch('/api/products')
       .then((r) => r.json())
       .then((data: unknown) => {
-        if (!Array.isArray(data)) { setLoading(false); return; } // API error
+        if (!Array.isArray(data)) { setLoading(false); return; }
         setProducts((data as Product[]).map(toFrontendProduct));
         setLoading(false);
       })
-      .catch((e) => {
-        console.error(e);
-        setLoading(false);
-      });
+      .catch((e) => { console.error(e); setLoading(false); });
   }, []);
 
   const filtered = useMemo(() => products.filter((p) => {
     const mc = cat === 'Tous' || p.category === cat;
-    const mq = p.name.toLowerCase().includes(query.toLowerCase());
+    const mq = !query || p.name.toLowerCase().includes(query.toLowerCase());
     return mc && mq;
   }), [products, query, cat]);
 
   return (
     <div className="min-h-screen pt-24 pb-32">
       <div className="max-w-screen-xl mx-auto px-6 md:px-10">
-        
+
         {/* Header */}
         <div className="py-12 border-b border-[var(--border-soft)] mb-8 flex flex-col md:flex-row md:items-end justify-between gap-8">
           <div>
             <span className="mask-wrap block mb-4">
-              <motion.h1 
+              <motion.h1
                 initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
                 className="font-cormorant text-5xl md:text-7xl font-light tracking-tight"
               >
-                La Boutique
+                {cat === 'Tous' ? 'La Boutique' : `Collection ${cat}`}
               </motion.h1>
             </span>
             <p className="text-sm text-[var(--text-muted)]">Découvrez notre collection complète de pièces d&apos;exception.</p>
@@ -107,5 +119,24 @@ export default function BoutiquePage() {
 
       </div>
     </div>
+  );
+}
+
+// Page wrapper avec Suspense requis par useSearchParams en App Router
+export default function BoutiquePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen pt-24 pb-32">
+        <div className="max-w-screen-xl mx-auto px-6 md:px-10 py-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="aspect-[3/4] bg-[var(--bg-alt)] rounded-sm animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </div>
+    }>
+      <BoutiqueContent />
+    </Suspense>
   );
 }

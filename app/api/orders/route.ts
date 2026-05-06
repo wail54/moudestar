@@ -23,6 +23,7 @@ export async function GET() {
       include: {
         items: { include: { product: true } },
         profile: { select: { email: true, role: true } },
+        creditsIssued: { select: { code: true, amount: true, remaining: true, isActive: true } },
       },
       orderBy: { date: 'desc' },
     });
@@ -78,15 +79,14 @@ export async function POST(req: Request) {
       }
     }
 
-    const TVA_RATE = 0.20;
+    // Prix déjà TTC — pas de TVA ajoutée
     const subtotal: number = items.reduce(
       (sum: number, i: any) => sum + i.product.price * i.quantity,
       0
     );
-    const tva = subtotal * TVA_RATE;
-    const grandTotal = subtotal + tva;
+    const grandTotal = subtotal;
 
-    let discountAmount = 0;
+    let discountAmount = body.discountAmount || 0;
     let storeCredit = null;
 
     if (finalStoreCreditCode) {
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
       if (storeCredit && storeCredit.isActive && storeCredit.remaining > 0) {
         if (!storeCredit.expiresAt || storeCredit.expiresAt >= new Date()) {
           if (!storeCredit.userId || storeCredit.userId === userId) {
-            discountAmount = Math.min(grandTotal, storeCredit.remaining);
+            discountAmount = Math.min(grandTotal, discountAmount || storeCredit.remaining);
           }
         }
       }
@@ -109,11 +109,11 @@ export async function POST(req: Request) {
         shippingAddress: finalShippingAddress,
         subtotal,
         discount: discountAmount,
-        tva,
+        tva: 0, // Prix TTC — TVA incluse
         total,
-        status: source === 'caisse' ? 'Terminée' : 'Confirmée', // Status mis à jour après paiement
+        status: source === 'caisse' ? 'Terminée' : 'Confirmée',
         source,
-        paymentMethod: paymentMethod || 'STRIPE', // STRIPE par défaut, ou CARD/CASH si caisse
+        paymentMethod: paymentMethod || 'STRIPE',
         items: {
           create: items.map((item: any) => ({
             productId: item.product.id,

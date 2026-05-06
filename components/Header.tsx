@@ -55,6 +55,8 @@ export function Header() {
   const links = [
     { href: '/', label: 'Accueil' },
     { href: '/boutique', label: 'Boutique' },
+    { href: '/boutique?category=Homme', label: 'Homme' },
+    { href: '/boutique?category=Femme', label: 'Femme' },
   ];
 
   return (

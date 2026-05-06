@@ -40,8 +40,8 @@ export async function POST(req: Request, { params }: Params) {
       return NextResponse.json({ error: 'Aucun article éligible au remboursement' }, { status: 400 });
     }
 
-    // Calcul du montant à rembourser (prix TTC = price * qty * 1.2)
-    const refundAmount = itemsToRefund.reduce((sum, i) => sum + i.price * i.quantity * 1.2, 0);
+    // Calcul du montant à rembourser (prix déjà TTC)
+    const refundAmount = itemsToRefund.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const refundAmountRounded = Math.round(refundAmount * 100) / 100;
 
     // 1. Remettre le stock des variantes

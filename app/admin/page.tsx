@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Package, PlusCircle, ShoppingBag,
-  Trash2, Landmark, Store, Globe, AlertTriangle, ChevronDown, PenLine, X, Copy, ImagePlus
+  Trash2, Landmark, Store, Globe, AlertTriangle, ChevronDown, PenLine, X, Copy, ImagePlus, Gift
 } from 'lucide-react';
 import { Product, toFrontendProduct, ProductVariant, SizeType } from '@/store/useStore';
 import { useToast } from '@/components/Toast';
@@ -41,6 +41,7 @@ interface Order {
   trackingNumber?: string;
   refundStatus?: string | null;
   creditCode?: string | null;
+  creditsIssued?: { code: string; amount: number; remaining: number; isActive: boolean }[];
   profile?: { email: string; role: string };
 }
 
@@ -72,7 +73,7 @@ export default function AdminPage() {
     name: string; description: string; price: string; images: string[]; category: string;
     featured: boolean; sizeType: SizeType; barcode: string; shortId: string; variants: Partial<ProductVariant>[];
   }>({
-    name: '', description: '', price: '', images: [], category: 'Vêtements', featured: false,
+    name: '', description: '', price: '', images: [], category: 'Homme', featured: false,
     sizeType: 'NONE', barcode: '', shortId: '', variants: []
   });
 
@@ -144,7 +145,7 @@ export default function AdminPage() {
     });
     if (res.ok) {
       await loadProducts();
-      setForm({ name: '', description: '', price: '', images: [], category: 'Vêtements', featured: false, sizeType: 'NONE', barcode: '', shortId: '', variants: [] });
+      setForm({ name: '', description: '', price: '', images: [], category: 'Homme', featured: false, sizeType: 'NONE', barcode: '', shortId: '', variants: [] });
       showToast('Produit créé avec succès', 'success');
       setTab('products');
     } else {
@@ -298,7 +299,7 @@ export default function AdminPage() {
                   <div>
                     <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Catégorie</label>
                     <select value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors">
-                      {['Vêtements', 'Accessoires', 'Chaussures'].map(c => <option key={c}>{c}</option>)}
+                      {['Homme', 'Femme', 'Mixte', 'Accessoires', 'Chaussures'].map(c => <option key={c}>{c}</option>)}
                     </select>
                   </div>
                 </div>
@@ -398,6 +399,11 @@ export default function AdminPage() {
               <span>{item.label}</span>
             </button>
           ))}
+          {/* Lien externe vers la page avoirs */}
+          <Link href="/admin/credits" className="flex items-center gap-3 px-4 py-3 md:py-4 text-[10px] md:text-[11px] font-medium tracking-widest uppercase rounded-sm transition-all text-[var(--text-muted)] hover:text-black hover:bg-[var(--bg-alt)] border border-transparent hover:border-[var(--border-soft)]">
+            <Gift size={16} className="shrink-0" />
+            <span>Avoirs</span>
+          </Link>
         </nav>
       </aside>
 
@@ -433,7 +439,7 @@ export default function AdminPage() {
 
                 {(() => {
                   const filtered = orderFilter === 'voucher'
-                    ? orders.filter(o => o.paymentMethod === 'VOUCHER' || o.creditCode)
+                    ? orders.filter(o => o.paymentMethod?.includes('Client en compte') || o.paymentMethod === 'VOUCHER' || o.creditCode)
                     : orders;
                   return filtered.length === 0 ? (
                     <div className="py-24 text-center bg-white rounded-sm border border-[var(--border-soft)]">
@@ -545,6 +551,22 @@ export default function AdminPage() {
                               <div className="flex flex-col gap-1">
                                 {order.discount > 0 && <p className="text-xs font-medium text-red-500 uppercase tracking-widest">Remise: -{order.discount.toFixed(2)} €</p>}
                                 <p className="font-cormorant text-2xl font-medium">Total: {order.total.toFixed(2)} €</p>
+                                {/* Avoirs générés par remboursement */}
+                                {order.creditsIssued && order.creditsIssued.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    {order.creditsIssued.map((credit) => (
+                                      <div key={credit.code} className="flex items-center gap-2 text-[10px]">
+                                        <Gift size={11} className="text-purple-600" />
+                                        <span className="font-mono font-medium text-purple-700">{credit.code}</span>
+                                        <span className="text-[var(--text-muted)]">— {credit.amount.toFixed(2)} €</span>
+                                        {!credit.isActive || credit.remaining === 0
+                                          ? <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-xs uppercase tracking-widest">Utilisé</span>
+                                          : <span className="px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded-xs uppercase tracking-widest">Actif</span>
+                                        }
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               {selectedItems.length > 0 && (
                                 <button
@@ -630,7 +652,7 @@ export default function AdminPage() {
                     <div>
                       <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Catégorie</label>
                       <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors">
-                        {['Vêtements', 'Accessoires', 'Chaussures'].map(c => <option key={c}>{c}</option>)}
+                        {['Homme', 'Femme', 'Mixte', 'Accessoires', 'Chaussures'].map(c => <option key={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
