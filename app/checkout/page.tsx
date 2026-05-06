@@ -19,6 +19,7 @@ export default function CheckoutPage() {
   const [addressQuery, setAddressQuery] = useState('');
   const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
   const [selectedAddress, setSelectedAddress] = useState('');
+  const [searchTimer, setSearchTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const [storeCreditCode, setStoreCreditCode] = useState('');
   const [appliedCredit, setAppliedCredit] = useState<{ code: string, amount: number } | null>(null);
@@ -44,27 +45,48 @@ export default function CheckoutPage() {
     checkAuth();
   }, [cart, router, supabase.auth, showToast]);
 
+  // Formate un résultat du géocodeur luxembourgeois en label lisible
+  const formatLuAddress = (r: any): string => {
+    const a = r.address || {};
+    const parts: string[] = [];
+    if (a.street) {
+      parts.push(a.housenumber ? `${a.street} ${a.housenumber}` : a.street);
+    } else if (r.geomlonlat?.coordinates) {
+      parts.push(r.addressFound || r.label || '');
+    }
+    if (a.postalCode) parts.push(a.postalCode);
+    if (a.locality) parts.push(a.locality);
+    return parts.filter(Boolean).join(', ') || r.label || JSON.stringify(r);
+  };
+
   const searchAddress = async (q: string) => {
     setAddressQuery(q);
-    if (q.length < 3) {
+    // Annuler le timer précédent (débounce)
+    if (searchTimer) clearTimeout(searchTimer);
+    if (q.length < 2) {
       setAddressSuggestions([]);
       return;
     }
-    try {
-      // Nominatim OpenStreetMap — recherche d'adresses luxembourgeoises en priorité
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=6&countrycodes=lu,be,fr`,
-        { headers: { 'Accept-Language': 'fr', 'User-Agent': 'Moudestar/1.0' } }
-      );
-      const data = await res.json();
-      setAddressSuggestions(data || []);
-    } catch (e) {
-      console.error(e);
-    }
+    const timer = setTimeout(async () => {
+      try {
+        // API officielle du Géoportail luxembourgeois
+        const res = await fetch(
+          `https://api.geoportail.lu/geocoder/search?queryString=${encodeURIComponent(q)}&limit=6`,
+          { headers: { 'Accept': 'application/json' } }
+        );
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+        setAddressSuggestions(data.results || []);
+      } catch (e) {
+        console.error('[GeoLU]', e);
+        setAddressSuggestions([]);
+      }
+    }, 250); // débounce 250ms
+    setSearchTimer(timer);
   };
 
   const selectAddress = (result: any) => {
-    const label = result.display_name;
+    const label = formatLuAddress(result);
     setSelectedAddress(label);
     setAddressQuery(label);
     setAddressSuggestions([]);
@@ -172,27 +194,35 @@ export default function CheckoutPage() {
             <div className="bg-white p-6 md:p-8 rounded-sm shadow-sm border border-[var(--border-soft)]">
               <h2 className="font-cormorant text-2xl font-medium mb-6">Adresse de Livraison</h2>
               <div className="relative">
-                <label className="block text-[10px] uppercase font-medium text-[var(--text-muted)] tracking-widest mb-2">Rechercher une adresse (Luxembourg, Belgique, France...)</label>
+                <label className="block text-[10px] uppercase font-medium text-[var(--text-muted)] tracking-widest mb-2">
+                  Rechercher une adresse au Luxembourg
+                </label>
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={addressQuery}
                     onChange={(e) => searchAddress(e.target.value)}
-                    placeholder="Commencez à taper votre adresse..."
+                    placeholder="Ex : 10 Rue de la Liberte, Luxembourg..."
                     className="w-full pl-12 pr-4 py-3 bg-[var(--bg-alt)] border border-transparent focus:border-[var(--border-soft)] outline-none rounded-sm text-sm"
                   />
                 </div>
                 {addressSuggestions.length > 0 && (
-                  <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[var(--border-soft)] shadow-lg rounded-sm overflow-hidden">
+                  <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[var(--border-soft)] shadow-lg rounded-sm overflow-hidden max-h-56 overflow-y-auto">
                     {addressSuggestions.map((result: any, idx: number) => (
                       <li key={idx}>
-                        <button onClick={() => selectAddress(result)} className="w-full text-left px-4 py-3 text-sm hover:bg-[var(--bg-alt)] transition-colors border-b border-[var(--border-soft)] last:border-0">
-                          {result.display_name}
+                        <button
+                          onClick={() => selectAddress(result)}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-[var(--bg-alt)] transition-colors border-b border-[var(--border-soft)] last:border-0"
+                        >
+                          <span className="font-medium">{formatLuAddress(result)}</span>
                         </button>
                       </li>
                     ))}
                   </ul>
+                )}
+                {selectedAddress && (
+                  <p className="mt-2 text-[10px] uppercase tracking-widest text-green-600 font-medium">✓ Adresse sélectionnée</p>
                 )}
               </div>
             </div>
