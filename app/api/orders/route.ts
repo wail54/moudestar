@@ -37,7 +37,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { items, source = 'en_ligne', sessionId, storeCreditCode, shippingAddress, paymentMethod } = body;
+    const { items, source = 'en_ligne', sessionId, storeCreditCode, shippingAddress, paymentMethod, voucherAmount, voucherCode } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: 'Panier vide' }, { status: 400 });
@@ -114,6 +114,8 @@ export async function POST(req: Request) {
         status: source === 'caisse' ? 'Terminée' : 'Confirmée',
         source,
         paymentMethod: paymentMethod || 'STRIPE',
+        voucherAmount: voucherAmount ? Number(voucherAmount) : null,
+        voucherCode: voucherCode || null,
         items: {
           create: items.map((item: any) => ({
             productId: item.product.id,

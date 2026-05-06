@@ -41,6 +41,8 @@ interface Order {
   trackingNumber?: string;
   refundStatus?: string | null;
   creditCode?: string | null;
+  voucherCode?: string | null;    // Code du bon "client en compte"
+  voucherAmount?: number | null;  // Montant payé par bon
   creditsIssued?: { code: string; amount: number; remaining: number; isActive: boolean }[];
   profile?: { email: string; role: string };
 }
@@ -66,6 +68,8 @@ export default function AdminPage() {
   // Refund: selected item IDs per order
   const [refundSelections, setRefundSelections] = useState<Record<string, string[]>>({});
   const [refundLoading, setRefundLoading] = useState<string | null>(null);
+  // Modal choix remboursement: { orderId, itemIds, amount }
+  const [refundModal, setRefundModal] = useState<{ orderId: string; itemIds: string[]; amount: number } | null>(null);
   // Filter
   const [orderFilter, setOrderFilter] = useState<'all' | 'voucher'>('all');
 
@@ -227,21 +231,23 @@ export default function AdminPage() {
     });
   };
 
-  const handleRefund = async (orderId: string) => {
+  const handleRefund = async (orderId: string, refundMode: 'credit' | 'cash' | 'card') => {
     const itemIds = refundSelections[orderId] || [];
     if (itemIds.length === 0) { showToast('Sélectionnez au moins un article', 'error'); return; }
     setRefundLoading(orderId);
+    setRefundModal(null);
     try {
       const res = await fetch(`/api/orders/${orderId}/refund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemIds }),
+        body: JSON.stringify({ itemIds, refundMode }),
       });
       const data = await res.json();
       if (res.ok) {
-        const msg = data.storeCreditCode
-          ? `Remboursé ${data.refundAmount.toFixed(2)} € — Avoir: ${data.storeCreditCode}`
-          : `Remboursé ${data.refundAmount.toFixed(2)} €`;
+        let msg = `Remboursé ${data.refundAmount.toFixed(2)} €`;
+        if (refundMode === 'credit' && data.storeCreditCode) msg += ` — Avoir: ${data.storeCreditCode}`;
+        else if (refundMode === 'cash') msg += ' (espèces)';
+        else if (refundMode === 'card') msg += ' (carte)';
         showToast(msg, 'success');
         setRefundSelections(prev => ({ ...prev, [orderId]: [] }));
         await loadOrders();
@@ -252,6 +258,10 @@ export default function AdminPage() {
       setRefundLoading(null);
     }
   };
+
+  // Calcul du montant des articles sélectionnés pour afficher dans le modal
+  const calcRefundAmount = (order: Order, itemIds: string[]) =>
+    order.items.filter(i => itemIds.includes(i.id)).reduce((s, i) => s + i.price * i.quantity, 0);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg-main)]">
@@ -270,6 +280,53 @@ export default function AdminPage() {
                 <button onClick={() => handleDeleteOrder(deleteId)} className="flex-1 py-3 bg-red-600 text-white text-xs font-medium uppercase tracking-widest rounded-sm hover:bg-red-700">Supprimer</button>
                 <button onClick={() => setDeleteId(null)} className="flex-1 py-3 bg-[var(--bg-alt)] text-black text-xs font-medium uppercase tracking-widest rounded-sm hover:bg-gray-200">Annuler</button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+        {/* ── Modal Choix Mode de Remboursement ── */}
+        {refundModal && (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div className="bg-white p-8 max-w-sm w-full rounded-sm shadow-xl" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
+              <h3 className="font-cormorant text-2xl font-light mb-2">Mode de remboursement</h3>
+              <p className="text-sm text-[var(--text-muted)] mb-1">Montant à rembourser</p>
+              <p className="text-3xl font-medium mb-6">{refundModal.amount.toFixed(2)} €</p>
+              <p className="text-[10px] uppercase tracking-widest font-medium text-[var(--text-muted)] mb-3">Comment rembourser le client ?</p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => handleRefund(refundModal.orderId, 'credit')}
+                  disabled={refundLoading === refundModal.orderId}
+                  className="flex items-start gap-3 p-4 border-2 border-black rounded-sm hover:bg-black hover:text-white transition-colors text-left group"
+                >
+                  <Gift size={18} className="mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Avoir (store credit)</p>
+                    <p className="text-[10px] text-[var(--text-muted)] group-hover:text-white/70 mt-0.5">Utilisable en boutique ou en caisse — valable indéfiniment</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleRefund(refundModal.orderId, 'cash')}
+                  disabled={refundLoading === refundModal.orderId}
+                  className="flex items-start gap-3 p-4 border border-[var(--border-soft)] rounded-sm hover:border-black transition-colors text-left"
+                >
+                  <span className="text-lg mt-0.5 shrink-0">💵</span>
+                  <div>
+                    <p className="text-sm font-medium">Remboursement Espèces</p>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Remise en main propre — aucun avoir généré</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleRefund(refundModal.orderId, 'card')}
+                  disabled={refundLoading === refundModal.orderId}
+                  className="flex items-start gap-3 p-4 border border-[var(--border-soft)] rounded-sm hover:border-black transition-colors text-left"
+                >
+                  <span className="text-lg mt-0.5 shrink-0">💳</span>
+                  <div>
+                    <p className="text-sm font-medium">Remboursement Carte</p>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Reversement sur la carte bancaire — aucun avoir généré</p>
+                  </div>
+                </button>
+              </div>
+              <button onClick={() => setRefundModal(null)} className="w-full mt-4 py-3 text-xs uppercase tracking-widest text-[var(--text-muted)] hover:text-black transition-colors">Annuler</button>
             </motion.div>
           </motion.div>
         )}
@@ -439,7 +496,7 @@ export default function AdminPage() {
 
                 {(() => {
                   const filtered = orderFilter === 'voucher'
-                    ? orders.filter(o => o.paymentMethod?.includes('Client en compte') || o.paymentMethod === 'VOUCHER' || o.creditCode)
+                    ? orders.filter(o => o.paymentMethod?.includes('Client en compte') || o.paymentMethod === 'VOUCHER' || o.creditCode || (o.voucherAmount && o.voucherAmount > 0))
                     : orders;
                   return filtered.length === 0 ? (
                     <div className="py-24 text-center bg-white rounded-sm border border-[var(--border-soft)]">
@@ -474,6 +531,13 @@ export default function AdminPage() {
                                 {order.paymentMethod && order.paymentMethod !== 'stripe' && (
                                   <span className="text-[9px] font-medium uppercase tracking-widest px-2 py-1 rounded-xs bg-purple-100 text-purple-700">{order.paymentMethod}</span>
                                 )}
+                                {/* Traçabilité bon / client en compte */}
+                                {(order.voucherAmount && order.voucherAmount > 0) ? (
+                                  <span className="flex items-center gap-1 text-[9px] font-medium uppercase tracking-widest px-2 py-1 rounded-xs bg-amber-100 text-amber-700 border border-amber-200">
+                                    🏷 Bon {order.voucherAmount.toFixed(2)} €
+                                    {order.voucherCode && <span className="font-mono normal-case ml-0.5 opacity-70">({order.voucherCode})</span>}
+                                  </span>
+                                ) : null}
                                 <div className="relative">
                                   <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value)}
                                     className="appearance-none pl-4 pr-8 py-1.5 text-[10px] font-medium tracking-widest uppercase bg-white border border-[var(--border-soft)] rounded-sm outline-none cursor-pointer hover:border-black transition-colors"
@@ -570,7 +634,11 @@ export default function AdminPage() {
                               </div>
                               {selectedItems.length > 0 && (
                                 <button
-                                  onClick={() => handleRefund(order.id)}
+                                  onClick={() => {
+                                    const itemIds = refundSelections[order.id] || [];
+                                    const amount = calcRefundAmount(order, itemIds);
+                                    setRefundModal({ orderId: order.id, itemIds, amount });
+                                  }}
                                   disabled={refundLoading === order.id}
                                   className="px-5 py-2 bg-orange-500 text-white text-[10px] uppercase tracking-widest font-medium rounded-sm hover:bg-orange-600 disabled:opacity-50"
                                 >

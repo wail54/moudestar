@@ -13,12 +13,12 @@ function getSupabase() {
 type Params = { params: Promise<{ id: string }> };
 
 // POST /api/orders/[id]/refund — remboursement partiel ou total (admin)
-// body: { itemIds: string[] }  — tableau des OrderItem.id à rembourser
+// body: { itemIds: string[], refundMode: 'credit' | 'cash' | 'card' }
 export async function POST(req: Request, { params }: Params) {
   try {
     const { id: orderId } = await params;
     const body = await req.json();
-    const { itemIds }: { itemIds: string[] } = body;
+    const { itemIds, refundMode = 'credit' }: { itemIds: string[]; refundMode?: 'credit' | 'cash' | 'card' } = body;
 
     if (!itemIds || itemIds.length === 0) {
       return NextResponse.json({ error: 'itemIds requis' }, { status: 400 });
@@ -62,9 +62,9 @@ export async function POST(req: Request, { params }: Params) {
       data: { refunded: true, refundedAt: new Date() },
     });
 
-    // 3. Générer un code Avoir pour le client
+    // 3. Générer un avoir UNIQUEMENT si le mode choisi est 'credit'
     let storeCreditCode: string | null = null;
-    if (order.userId && refundAmountRounded > 0) {
+    if (refundMode === 'credit' && refundAmountRounded > 0) {
       storeCreditCode = `AVOIR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       await prisma.storeCredit.create({
         data: {
@@ -72,7 +72,7 @@ export async function POST(req: Request, { params }: Params) {
           amount: refundAmountRounded,
           remaining: refundAmountRounded,
           isActive: true,
-          userId: order.userId,
+          userId: order.userId || null,
           sourceOrderId: orderId,
           reason: 'refund',
         },
@@ -91,6 +91,7 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({
       success: true,
       refundAmount: refundAmountRounded,
+      refundMode,
       storeCreditCode,
     });
   } catch (error) {

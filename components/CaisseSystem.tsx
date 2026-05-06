@@ -104,7 +104,21 @@ export function CaisseSystem() {
       product: { id: fi.id, name: fi.name, price: fi.price, description: '', images: [], category: 'Libre', featured: false, sizeType: 'NONE', barcode: null, shortId: null, variants: [] },
       quantity: 1,
     }));
-    const payMethod = meta.finalMethod === 'cash' ? 'CASH' : 'CARD';
+
+    // Construire un paymentMethod descriptif pour traçabilité
+    const voucher = meta.voucherAmount || 0;
+    const cashPart = meta.finalMethod === 'cash' ? 'Espèces' : 'Carte';
+    let payMethod: string;
+    if (voucher > 0 && (meta.remainingAfterCredits ?? 0) > 0) {
+      // Paiement hybride : bon + cash/carte
+      payMethod = `Client en compte (${voucher.toFixed(2)}€) + ${cashPart}`;
+    } else if (voucher > 0) {
+      // Entièrement payé par bon
+      payMethod = `Client en compte (${voucher.toFixed(2)}€)`;
+    } else {
+      payMethod = meta.finalMethod === 'cash' ? 'CASH' : 'CARD';
+    }
+
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
@@ -116,6 +130,9 @@ export function CaisseSystem() {
           paymentMethod: payMethod,
           storeCreditCode: meta.creditCode,
           creditCode: meta.creditCode,
+          // Traçabilité bon client en compte
+          voucherAmount: voucher > 0 ? voucher : undefined,
+          voucherCode: voucher > 0 ? 'BON-MAIRIE' : undefined, // Peut être saisi manuellement dans le futur
         }),
       });
       if (!res.ok) {
