@@ -51,17 +51,22 @@ export default function CheckoutPage() {
       return;
     }
     try {
-      const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=5`);
+      // Nominatim OpenStreetMap — recherche d'adresses luxembourgeoises en priorité
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=6&countrycodes=lu,be,fr`,
+        { headers: { 'Accept-Language': 'fr', 'User-Agent': 'Moudestar/1.0' } }
+      );
       const data = await res.json();
-      setAddressSuggestions(data.features || []);
+      setAddressSuggestions(data || []);
     } catch (e) {
       console.error(e);
     }
   };
 
-  const selectAddress = (feature: any) => {
-    setSelectedAddress(feature.properties.label);
-    setAddressQuery(feature.properties.label);
+  const selectAddress = (result: any) => {
+    const label = result.display_name;
+    setSelectedAddress(label);
+    setAddressQuery(label);
     setAddressSuggestions([]);
   };
 
@@ -141,8 +146,8 @@ export default function CheckoutPage() {
   }
 
   const subtotal = cart.reduce((s, i) => s + i.product.price * i.quantity, 0);
-  const tva = subtotal * 0.2;
-  const grandTotal = subtotal + tva;
+  // Prix TTC — pas de TVA ajoutée
+  const grandTotal = subtotal;
   const discountAmt = appliedCredit ? Math.min(grandTotal, appliedCredit.amount) : 0;
   const finalTotal = grandTotal - discountAmt;
 
@@ -167,7 +172,7 @@ export default function CheckoutPage() {
             <div className="bg-white p-6 md:p-8 rounded-sm shadow-sm border border-[var(--border-soft)]">
               <h2 className="font-cormorant text-2xl font-medium mb-6">Adresse de Livraison</h2>
               <div className="relative">
-                <label className="block text-[10px] uppercase font-medium text-[var(--text-muted)] tracking-widest mb-2">Rechercher une adresse (France)</label>
+                <label className="block text-[10px] uppercase font-medium text-[var(--text-muted)] tracking-widest mb-2">Rechercher une adresse (Luxembourg, Belgique, France...)</label>
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
                   <input 
@@ -180,10 +185,10 @@ export default function CheckoutPage() {
                 </div>
                 {addressSuggestions.length > 0 && (
                   <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[var(--border-soft)] shadow-lg rounded-sm overflow-hidden">
-                    {addressSuggestions.map((feat, idx) => (
+                    {addressSuggestions.map((result: any, idx: number) => (
                       <li key={idx}>
-                        <button onClick={() => selectAddress(feat)} className="w-full text-left px-4 py-3 text-sm hover:bg-[var(--bg-alt)] transition-colors border-b border-[var(--border-soft)] last:border-0">
-                          {feat.properties.label}
+                        <button onClick={() => selectAddress(result)} className="w-full text-left px-4 py-3 text-sm hover:bg-[var(--bg-alt)] transition-colors border-b border-[var(--border-soft)] last:border-0">
+                          {result.display_name}
                         </button>
                       </li>
                     ))}
@@ -232,10 +237,7 @@ export default function CheckoutPage() {
 
               <div className="space-y-3 mb-8 pt-6 border-t border-[var(--border-soft)]">
                 <div className="flex justify-between text-sm text-[var(--text-muted)]">
-                  <span>Sous-total HT</span><span>{subtotal.toFixed(2)} €</span>
-                </div>
-                <div className="flex justify-between text-sm text-[var(--text-muted)]">
-                  <span>TVA (20%)</span><span>{tva.toFixed(2)} €</span>
+                  <span>Sous-total</span><span>{subtotal.toFixed(2)} €</span>
                 </div>
                 {appliedCredit && (
                   <div className="flex justify-between text-sm font-medium text-red-500">
@@ -243,7 +245,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <div className="flex justify-between text-xl font-medium pt-4 border-t border-[var(--border-soft)] mt-4">
-                  <span>Total TTC</span><span>{finalTotal.toFixed(2)} €</span>
+                  <span>Total</span><span>{finalTotal.toFixed(2)} €</span>
                 </div>
               </div>
 

@@ -328,18 +328,15 @@ export default function AccountPage() {
                             {/* Totaux */}
                             <div className="pt-4 border-t border-[var(--border-soft)] space-y-1.5">
                               <div className="flex justify-between text-xs text-[var(--text-muted)]">
-                                <span>Sous-total HT</span><span>{order.subtotal.toFixed(2)} €</span>
+                                <span>Sous-total</span><span>{order.subtotal.toFixed(2)} €</span>
                               </div>
                               {order.discount > 0 && (
                                 <div className="flex justify-between text-xs text-red-500 font-medium">
                                   <span>Remise / Avoir</span><span>-{order.discount.toFixed(2)} €</span>
                                 </div>
                               )}
-                              <div className="flex justify-between text-xs text-[var(--text-muted)]">
-                                <span>TVA (20%)</span><span>{order.tva.toFixed(2)} €</span>
-                              </div>
                               <div className="flex justify-between font-medium text-base pt-2 border-t border-[var(--border-soft)]">
-                                <span>Total TTC</span><span>{order.total.toFixed(2)} €</span>
+                                <span>Total</span><span>{order.total.toFixed(2)} €</span>
                               </div>
                             </div>
 

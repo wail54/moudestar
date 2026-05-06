@@ -40,8 +40,8 @@ export function CartDrawer() {
   };
 
   const subtotal = cart.reduce((s, i) => s + i.product.price * i.quantity, 0);
-  const tva = subtotal * 0.2;
-  const total = subtotal + tva;
+  // Prix TTC — pas de TVA ajoutée
+  const total = subtotal;
 
   return (
     <>
@@ -123,10 +123,9 @@ export function CartDrawer() {
             {cart.length > 0 && (
               <div className="px-8 py-8 border-t border-[var(--border-soft)] bg-white">
                 <div className="space-y-3 mb-8">
-                  <div className="flex justify-between text-xs font-medium text-[var(--text-muted)]"><span>Sous-total HT</span><span>{subtotal.toFixed(2)} €</span></div>
-                  <div className="flex justify-between text-xs font-medium text-[var(--text-muted)]"><span>TVA (20%)</span><span>{tva.toFixed(2)} €</span></div>
+                  <div className="flex justify-between text-xs font-medium text-[var(--text-muted)]"><span>Sous-total</span><span>{subtotal.toFixed(2)} €</span></div>
                   <div className="flex justify-between pt-4 mt-2 font-medium text-lg border-t border-[var(--border-soft)]">
-                    <span>Total TTC</span><span>{total.toFixed(2)} €</span>
+                    <span>Total</span><span>{total.toFixed(2)} €</span>
                   </div>
                 </div>
                 <button

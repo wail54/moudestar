@@ -36,12 +36,12 @@ export async function POST(req: Request) {
     let discountAmount = 0;
     let storeCredit = null;
 
+    // Prix déjà TTC — pas de TVA ajoutée
     let subtotal = 0;
     for (const item of items) {
       subtotal += item.product.price * item.quantity;
     }
-    const tva = subtotal * 0.20;
-    const grandTotal = subtotal + tva;
+    const grandTotal = subtotal;
 
     if (storeCreditCode) {
       storeCredit = await prisma.storeCredit.findUnique({ where: { code: storeCreditCode } });
@@ -77,27 +77,9 @@ export async function POST(req: Request) {
       });
     }
 
-    const line_items = items.map((item: any) => {
-      const variantName = [item.size, item.color].filter(Boolean).join(' - ');
-      return {
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: item.product.name + (variantName ? ` (${variantName})` : ''),
-            images: item.product.images?.length > 0 ? [item.product.images[0]] : (item.product.image ? [item.product.image] : []),
-          },
-          unit_amount: Math.round(item.product.price * 100), // Note: on applique la TVA via unit_amount ici ? Non, les prix Moudestar semblent être TTC ou alors on gère ça séparément. Wait, l'ancien code ne gérait pas la TVA sur Stripe. Moudestar l'ajoute dans le drawer.
-          // On va corriger : Stripe prend le unit_amount. Le Drawer calcule la TVA sur le Subtotal HT.
-          // Donc on envoie TTC à stripe.
-        },
-        quantity: item.quantity,
-      };
-    });
-
-    // Correction: On doit envoyer le prix TTC
+    // Prix TTC directs — pas de multiplication par 1.20
     const line_items_ttc = items.map((item: any) => {
       const variantName = [item.size, item.color].filter(Boolean).join(' - ');
-      const priceTTC = item.product.price * 1.20; // +20% TVA
       return {
         price_data: {
           currency: 'eur',
@@ -105,7 +87,7 @@ export async function POST(req: Request) {
             name: item.product.name + (variantName ? ` (${variantName})` : ''),
             images: item.product.images?.length > 0 ? [item.product.images[0]] : (item.product.image ? [item.product.image] : []),
           },
-          unit_amount: Math.round(priceTTC * 100), 
+          unit_amount: Math.round(item.product.price * 100), // TTC
         },
         quantity: item.quantity,
       };
@@ -139,7 +121,8 @@ export async function POST(req: Request) {
 
     if (!shippingAddress) {
       sessionData.shipping_address_collection = {
-        allowed_countries: ['FR', 'BE', 'CH', 'LU', 'MC'],
+        // LU en premier = pays par défaut dans Stripe Checkout
+        allowed_countries: ['LU', 'BE', 'FR', 'CH', 'MC'],
       };
     }
 
