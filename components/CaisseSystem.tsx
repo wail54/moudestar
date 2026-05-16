@@ -303,8 +303,10 @@ export function CaisseSystem() {
             onChange={setQuery}
             products={products}
             onExactMatch={(p, variantId, size, color) => {
-              if (p.sizeType !== 'NONE' && !variantId && p.variants && p.variants.length > 1) {
+              // Si pas de variantId fourni (match au niveau produit) OU s'il y a des variantes → modal obligatoire
+              if (!variantId || (p.variants && p.variants.length > 1)) {
                 setVariantModalProduct(p);
+                setSelectedColor(null);
               } else {
                 addToPos(p, variantId, size, color);
               }

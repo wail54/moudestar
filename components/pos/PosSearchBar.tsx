@@ -29,14 +29,13 @@ export function PosSearchBar({ query, onChange, products, onExactMatch }: Props)
 
     // Search through products and variants
     for (const p of products) {
-      // Check product-level codes
+      // Check product-level codes → open modal (no variant forced)
       if ((isExactBarcode && p.barcode === q) || (isExactShortId && p.shortId === q)) {
-        const variant = p.variants?.[0];
-        onExactMatch(p, variant?.id, variant?.size || undefined, variant?.color || undefined);
+        onExactMatch(p, undefined, undefined, undefined);
         onChange('');
         return;
       }
-      // Check variant-level codes
+      // Check variant-level codes → add directly with that specific variant
       if (p.variants) {
         for (const v of p.variants) {
           if ((isExactBarcode && v.barcode === q) || (isExactShortId && v.shortId === q)) {

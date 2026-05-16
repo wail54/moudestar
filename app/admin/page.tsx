@@ -380,6 +380,20 @@ export default function AdminPage() {
                       </label>
                     </div>
                   </div>
+
+                  {/* ── Type de taille (modifiable en édition) ── */}
+                  <div className="mt-4">
+                    <label className="block text-[10px] uppercase font-medium text-black mb-2">Type de taille</label>
+                    <select
+                      value={editingProduct.sizeType}
+                      onChange={e => setEditingProduct({...editingProduct, sizeType: e.target.value as SizeType})}
+                      className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors"
+                    >
+                      <option value="NONE">Taille Unique / Sans taille</option>
+                      <option value="CLOTHING">Vêtements (XS, S, M, L, XL, XXL)</option>
+                      <option value="SHOES">Chaussures (34 → 48)</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* ── Images ── */}
@@ -395,7 +409,21 @@ export default function AdminPage() {
                 <div className="pt-4 border-t border-[var(--border-soft)]">
                   <div className="flex justify-between items-center mb-3">
                     <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)]">Variantes & Stock</label>
-                    <button type="button" onClick={() => setEditingProduct({...editingProduct, variants: [...editingProduct.variants, { id: '', productId: editingProduct.id, color: '', size: '', stock: 0, barcode: '', shortId: '' }]})} className="text-[10px] uppercase tracking-widest font-medium text-black underline">Ajouter</button>
+                    <div className="flex gap-3">
+                      {editingProduct.sizeType !== 'NONE' && editingProduct.variants.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sizes = editingProduct.sizeType === 'CLOTHING' ? CLOTHING_SIZES : SHOE_SIZES;
+                            setEditingProduct({...editingProduct, variants: sizes.map(size => ({ id: '', productId: editingProduct.id, color: '', size, stock: 0, barcode: '', shortId: '' }))});
+                          }}
+                          className="text-[10px] uppercase tracking-widest font-medium text-black border-b border-black pb-0.5"
+                        >
+                          Générer tailles
+                        </button>
+                      )}
+                      <button type="button" onClick={() => setEditingProduct({...editingProduct, variants: [...editingProduct.variants, { id: '', productId: editingProduct.id, color: '', size: '', stock: 0, barcode: '', shortId: '' }]})} className="text-[10px] uppercase tracking-widest font-medium text-black underline">Ajouter</button>
+                    </div>
                   </div>
                   {editingProduct.variants.length === 0 && (
                     <p className="text-sm text-[var(--text-muted)] italic">Aucune variante — produit taille unique.</p>

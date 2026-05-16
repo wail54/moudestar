@@ -129,15 +129,8 @@ export async function POST(req: Request) {
     // Pas de coupon ici — la réduction est intégrée comme line item négatif
     // pour rester compatible avec shipping_options
 
-    if (!shippingAddress) {
-      sessionData.shipping_address_collection = {
-        // LU en premier = pays par défaut dans Stripe Checkout
-        allowed_countries: ['LU', 'BE', 'FR', 'CH', 'MC'],
-      };
-    }
-
-    // Frais de port : proposés via shipping_options Stripe
-    // (Compatible avec le coupon de réduction)
+    // Frais de port conditionnels : 4,90€ si sous-total < 50€, gratuit sinon
+    // shipping_options remplace shipping_address_collection (mutuellement exclusifs dans Stripe)
     const shippingOptions = [
       {
         shipping_rate_data: {
@@ -147,17 +140,18 @@ export async function POST(req: Request) {
             currency: 'eur',
           },
           display_name: shippingFeeEuros === 0 ? 'Livraison offerte' : 'Livraison standard',
-          ...(shippingFeeEuros === 0 ? {} : { delivery_estimate: {
-            minimum: { unit: 'business_day' as const, value: 3 },
-            maximum: { unit: 'business_day' as const, value: 7 },
-          }}),
+          ...(shippingFeeEuros > 0 ? {
+            delivery_estimate: {
+              minimum: { unit: 'business_day' as const, value: 3 },
+              maximum: { unit: 'business_day' as const, value: 7 },
+            }
+          } : {}),
         },
       },
     ];
 
-    // Ajouter les frais de port au sessionData uniquement pour les commandes en ligne
     if (!shippingAddress) {
-      // Livraison à domicile : on ajoute les shipping_options
+      // shipping_options gère déjà la collecte d'adresse — pas besoin de shipping_address_collection
       sessionData.shipping_options = shippingOptions;
     }
 
