@@ -171,7 +171,10 @@ export default function CheckoutPage() {
   // Prix TTC — pas de TVA ajoutée
   const grandTotal = subtotal;
   const discountAmt = appliedCredit ? Math.min(grandTotal, appliedCredit.amount) : 0;
-  const finalTotal = grandTotal - discountAmt;
+  const afterDiscount = grandTotal - discountAmt;
+  // Frais de livraison : 4,90€ si sous-total < 50€, gratuit sinon
+  const shippingFee = subtotal < 50 ? 4.90 : 0;
+  const finalTotal = afterDiscount + shippingFee;
 
   return (
     <div className="min-h-screen pt-32 pb-20 bg-[var(--bg-main)]">
@@ -273,6 +276,19 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-sm font-medium text-red-500">
                     <span>Avoir appliqué</span><span>-{discountAmt.toFixed(2)} €</span>
                   </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">Livraison</span>
+                  {shippingFee === 0 ? (
+                    <span className="text-green-600 font-medium">Offerte 🎉</span>
+                  ) : (
+                    <span>{shippingFee.toFixed(2)} €</span>
+                  )}
+                </div>
+                {subtotal < 50 && (
+                  <p className="text-[10px] text-[var(--text-muted)] italic">
+                    Livraison offerte dès 50,00 € d'achat
+                  </p>
                 )}
                 <div className="flex justify-between text-xl font-medium pt-4 border-t border-[var(--border-soft)] mt-4">
                   <span>Total</span><span>{finalTotal.toFixed(2)} €</span>

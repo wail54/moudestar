@@ -63,7 +63,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const images = product.images?.length > 0 ? product.images : (product.image ? [product.image] : []);
   const totalStock = product.variants?.reduce((acc, v) => acc + v.stock, 0) ?? 0;
-  const isOutOfStock = product.sizeType !== 'NONE' && totalStock === 0;
+  // Un produit est considéré "avec variantes" s'il a au moins une variante avec taille ou couleur
+  const hasVariants = (product.variants?.length ?? 0) > 0 &&
+    product.variants!.some(v => v.color || v.size);
+  const isOutOfStock = hasVariants && totalStock === 0;
 
   // Extraire couleurs et tailles uniques
   const colors = Array.from(new Set(product.variants?.map(v => v.color).filter(Boolean))) as string[];
@@ -72,7 +75,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const handleAdd = () => {
     if (isOutOfStock) return;
     
-    if (product.sizeType !== 'NONE' && !selectedVariant) {
+    if (hasVariants && !selectedVariant) {
       showToast('Veuillez sélectionner une option valide', 'error');
       return;
     }
@@ -146,7 +149,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {product.description}
             </div>
 
-            {product.sizeType !== 'NONE' && (
+            {hasVariants && (
               <div className="mb-10 flex flex-col gap-6">
                 
                 {/* COULEURS */}
@@ -211,11 +214,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
             <button
               onClick={handleAdd}
-              disabled={!!isOutOfStock || (product.sizeType !== 'NONE' && !selectedVariant) || !!(selectedVariant && selectedVariant.stock === 0)}
+              disabled={!!isOutOfStock || (hasVariants && !selectedVariant) || !!(selectedVariant && selectedVariant.stock === 0)}
               className="btn-primary w-full py-5 text-sm rounded-sm mt-auto"
             >
               <ShoppingBag size={16} />
-              {isOutOfStock ? 'Rupture de stock' : (!selectedVariant && product.sizeType !== 'NONE') ? 'Sélectionner une option' : selectedVariant?.stock === 0 ? 'Variante épuisée' : 'Ajouter au panier'}
+              {isOutOfStock ? 'Rupture de stock' : (!selectedVariant && hasVariants) ? 'Sélectionner une option' : selectedVariant?.stock === 0 ? 'Variante épuisée' : 'Ajouter au panier'}
             </button>
           </motion.div>
         </div>

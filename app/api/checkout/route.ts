@@ -150,10 +150,8 @@ export async function POST(req: Request) {
       },
     ];
 
-    if (!shippingAddress) {
-      // shipping_options gère déjà la collecte d'adresse — pas besoin de shipping_address_collection
-      sessionData.shipping_options = shippingOptions;
-    }
+    // Frais de port ajoutés systématiquement (adresse pré-remplie ou non)
+    sessionData.shipping_options = shippingOptions;
 
     const session = await stripe.checkout.sessions.create(sessionData);
 
