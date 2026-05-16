@@ -34,6 +34,7 @@ export function CaisseSystem() {
   const [freePrice, setFreePrice] = useState('');
   const [email, setEmail] = useState('');
   const [variantModalProduct, setVariantModalProduct] = useState<Product | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [lastTotal, setLastTotal] = useState(0);
 
@@ -53,6 +54,7 @@ export function CaisseSystem() {
   const handleProductClick = (p: Product) => {
     if (p.sizeType !== 'NONE' || (p.variants && p.variants.length > 1)) {
       setVariantModalProduct(p);
+      setSelectedColor(null);
     } else {
       const variant = p.variants?.[0];
       addToPos(p, variant?.id, variant?.size || undefined, variant?.color || undefined);
@@ -169,49 +171,103 @@ export function CaisseSystem() {
   return (
     <>
       <AnimatePresence>
-        {variantModalProduct && (
-          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="bg-white p-6 md:p-8 w-full max-w-lg rounded-sm shadow-xl max-h-[90vh] overflow-y-auto" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-cormorant text-2xl font-light">Choisir la variante</h3>
-                <button onClick={() => setVariantModalProduct(null)} className="text-[var(--text-muted)] hover:text-black"><X size={20} /></button>
-              </div>
-              <p className="text-sm font-medium mb-6">{variantModalProduct.name}</p>
-              
-              {variantModalProduct.variants?.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {variantModalProduct.variants.map((v, i) => {
-                    const isOos = v.stock === 0;
-                    return (
-                      <button
-                        key={i}
-                        disabled={isOos}
-                        onClick={() => addToPos(variantModalProduct, v.id, v.size || undefined, v.color || undefined)}
-                        className={`flex justify-between items-center py-3 px-4 text-sm font-medium rounded-sm border transition-colors ${isOos ? 'bg-[var(--bg-alt)] text-[var(--text-muted)] border-[var(--border-soft)] opacity-50 cursor-not-allowed' : 'bg-white border-[var(--border-soft)] hover:border-black text-black'}`}
-                      >
-                        <div className="flex gap-4">
-                          {v.size && <span>Taille: {v.size}</span>}
-                          {v.color && <span>Couleur: {v.color}</span>}
-                          {!v.size && !v.color && <span>Base</span>}
-                        </div>
-                        <div className="text-xs text-[var(--text-muted)] flex items-center gap-4">
-                          <span>Stock: {v.stock}</span>
-                          {(v.barcode || v.shortId) && (
-                            <span className="bg-[var(--bg-alt)] px-2 py-1 rounded-sm border border-[var(--border-soft)]">
-                              {v.shortId || v.barcode}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
+        {variantModalProduct && (() => {
+          const variants = variantModalProduct.variants || [];
+          // Collect unique non-null colors that have stock
+          const hasColors = variants.some(v => v.color);
+          const availableColors = hasColors
+            ? [...new Set(variants.filter(v => v.color).map(v => v.color as string))]
+            : [];
+          // Variants filtered by selected color (Step B)
+          const filteredVariants = selectedColor
+            ? variants.filter(v => v.color === selectedColor)
+            : variants;
+
+          return (
+            <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <motion.div className="bg-white p-6 md:p-8 w-full max-w-lg rounded-sm shadow-xl max-h-[90vh] overflow-y-auto" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="font-cormorant text-2xl font-light">
+                      {hasColors && !selectedColor ? 'Choisir la couleur' : 'Choisir la taille'}
+                    </h3>
+                    {selectedColor && (
+                      <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mt-1">
+                        Couleur sélectionnée&nbsp;: <span className="text-black font-semibold">{selectedColor}</span>
+                      </p>
+                    )}
+                  </div>
+                  <button onClick={() => { setVariantModalProduct(null); setSelectedColor(null); }} className="text-[var(--text-muted)] hover:text-black"><X size={20} /></button>
                 </div>
-              ) : (
-                <p className="text-sm text-red-500">Aucune variante disponible pour ce produit.</p>
-              )}
+                <p className="text-sm font-medium mb-6">{variantModalProduct.name}</p>
+
+                {variants.length > 0 ? (
+                  hasColors && !selectedColor ? (
+                    /* ── STEP A : Colour picker ── */
+                    <div className="flex flex-wrap gap-3">
+                      {availableColors.map((color) => {
+                        const inStock = variants.filter(v => v.color === color).some(v => v.stock > 0);
+                        return (
+                          <button
+                            key={color}
+                            disabled={!inStock}
+                            onClick={() => setSelectedColor(color)}
+                            className={`px-5 py-3 text-sm font-medium rounded-sm border transition-colors ${
+                              !inStock
+                                ? 'bg-[var(--bg-alt)] text-[var(--text-muted)] border-[var(--border-soft)] opacity-40 cursor-not-allowed'
+                                : 'bg-white border-[var(--border-soft)] hover:border-black hover:bg-black hover:text-white text-black'
+                            }`}
+                          >
+                            {color}
+                            {!inStock && <span className="ml-2 text-[9px] uppercase tracking-widest opacity-60">Épuisé</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* ── STEP B : Size picker (or flat list if no colors) ── */
+                    <div className="flex flex-col gap-2">
+                      {selectedColor && (
+                        <button
+                          onClick={() => setSelectedColor(null)}
+                          className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-medium text-[var(--text-muted)] hover:text-black mb-2 transition-colors"
+                        >
+                          ← Changer de couleur
+                        </button>
+                      )}
+                      {filteredVariants.map((v, i) => {
+                        const isOos = v.stock === 0;
+                        return (
+                          <button
+                            key={i}
+                            disabled={isOos}
+                            onClick={() => { addToPos(variantModalProduct, v.id, v.size || undefined, v.color || undefined); setSelectedColor(null); }}
+                            className={`flex justify-between items-center py-3 px-4 text-sm font-medium rounded-sm border transition-colors ${isOos ? 'bg-[var(--bg-alt)] text-[var(--text-muted)] border-[var(--border-soft)] opacity-50 cursor-not-allowed' : 'bg-white border-[var(--border-soft)] hover:border-black text-black'}`}
+                          >
+                            <div className="flex gap-4">
+                              {v.size && <span>Taille&nbsp;: {v.size}</span>}
+                              {!v.size && !v.color && <span>Base</span>}
+                            </div>
+                            <div className="text-xs text-[var(--text-muted)] flex items-center gap-4">
+                              <span>Stock&nbsp;: {v.stock}</span>
+                              {(v.barcode || v.shortId) && (
+                                <span className="bg-[var(--bg-alt)] px-2 py-1 rounded-sm border border-[var(--border-soft)]">
+                                  {v.shortId || v.barcode}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : (
+                  <p className="text-sm text-red-500">Aucune variante disponible pour ce produit.</p>
+                )}
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          );
+        })()}
 
         {showFree && (
           <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>

@@ -43,6 +43,9 @@ export async function POST(req: Request) {
     }
     const grandTotal = subtotal;
 
+    // Frais de livraison conditionnels : 4,90€ si sous-total < 50€, gratuit sinon
+    const shippingFeeEuros = subtotal < 50 ? 4.90 : 0;
+
     if (storeCreditCode) {
       storeCredit = await prisma.storeCredit.findUnique({ where: { code: storeCreditCode } });
       if (storeCredit && storeCredit.isActive && storeCredit.remaining > 0) {
@@ -65,16 +68,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ url: `${origin}/checkout/success?session_id=${pseudoSessionId}&free=true` });
     }
 
-    // Calcul de la réduction en pourcentage pour Stripe
-    // Stripe Coupons : On peut créer un coupon ou utiliser des discounts. 
-    // Mieux: On répartit le discount sur les items ou on crée un coupon éphémère.
-    let coupon = null;
+    // Stripe ne permet pas de combiner `discounts` (coupon) + `shipping_options`.
+    // On utilise un line item négatif à la place pour la réduction avoir.
+    let discountLineItem: any = null;
     if (discountAmount > 0) {
-      coupon = await stripe.coupons.create({
-        amount_off: Math.round(discountAmount * 100),
-        currency: 'eur',
-        duration: 'once',
-      });
+      discountLineItem = {
+        price_data: {
+          currency: 'eur',
+          product_data: {
+            name: `Réduction avoir (${storeCreditCode})`,
+          },
+          unit_amount: -Math.round(discountAmount * 100), // Montant négatif
+        },
+        quantity: 1,
+      };
     }
 
     // Prix TTC directs — pas de multiplication par 1.20
@@ -92,6 +99,10 @@ export async function POST(req: Request) {
         quantity: item.quantity,
       };
     });
+    // Ajouter le line item de réduction (négatif) si applicable
+    if (discountLineItem) {
+      line_items_ttc.push(discountLineItem);
+    }
 
     const encodedAddr = shippingAddress ? encodeURIComponent(shippingAddress) : '';
     const encodedSc = storeCreditCode ? encodeURIComponent(storeCreditCode) : '';
@@ -115,15 +126,39 @@ export async function POST(req: Request) {
       sessionData.customer_email = userEmail;
     }
 
-    if (coupon) {
-      sessionData.discounts = [{ coupon: coupon.id }];
-    }
+    // Pas de coupon ici — la réduction est intégrée comme line item négatif
+    // pour rester compatible avec shipping_options
 
     if (!shippingAddress) {
       sessionData.shipping_address_collection = {
         // LU en premier = pays par défaut dans Stripe Checkout
         allowed_countries: ['LU', 'BE', 'FR', 'CH', 'MC'],
       };
+    }
+
+    // Frais de port : proposés via shipping_options Stripe
+    // (Compatible avec le coupon de réduction)
+    const shippingOptions = [
+      {
+        shipping_rate_data: {
+          type: 'fixed_amount' as const,
+          fixed_amount: {
+            amount: Math.round(shippingFeeEuros * 100), // 490 ou 0
+            currency: 'eur',
+          },
+          display_name: shippingFeeEuros === 0 ? 'Livraison offerte' : 'Livraison standard',
+          ...(shippingFeeEuros === 0 ? {} : { delivery_estimate: {
+            minimum: { unit: 'business_day' as const, value: 3 },
+            maximum: { unit: 'business_day' as const, value: 7 },
+          }}),
+        },
+      },
+    ];
+
+    // Ajouter les frais de port au sessionData uniquement pour les commandes en ligne
+    if (!shippingAddress) {
+      // Livraison à domicile : on ajoute les shipping_options
+      sessionData.shipping_options = shippingOptions;
     }
 
     const session = await stripe.checkout.sessions.create(sessionData);
