@@ -11,6 +11,8 @@ import { PosSearchBar } from '@/components/pos/PosSearchBar';
 
 type DiscountType = 'pct' | 'fixed';
 interface FreeItem { id: string; name: string; price: number; }
+// Remise par ligne : key = `${productId}-${variantId??''}`
+type ItemDiscount = { value: string; type: DiscountType };
 
 export function CaisseSystem() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -37,6 +39,9 @@ export function CaisseSystem() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [lastTotal, setLastTotal] = useState(0);
+  // Remises par ligne : key = `${productId}-${variantId??''}`
+  const [itemDiscounts, setItemDiscounts] = useState<Record<string, ItemDiscount>>({});
+  const [editingDiscountKey, setEditingDiscountKey] = useState<string | null>(null);
 
   const results = useMemo(() => {
     if (!query.trim()) return products;
@@ -72,9 +77,24 @@ export function CaisseSystem() {
     setFreeName(''); setFreePrice(''); setShowFree(false);
   };
 
-  const catalogTotal = posCart.reduce((s, i) => s + i.product.price * i.quantity, 0);
+  // Helper : calcule le prix après remise pour une ligne
+  const getItemLineKey = (i: CartItem) => `${i.product.id}-${i.variantId ?? ''}`;
+  const getItemDiscountedPrice = (i: CartItem): number => {
+    const key = getItemLineKey(i);
+    const d = itemDiscounts[key];
+    if (!d || !d.value) return i.product.price;
+    const v = parseFloat(d.value) || 0;
+    if (d.type === 'pct') return Math.max(0, i.product.price * (1 - v / 100));
+    return Math.max(0, i.product.price - v);
+  };
+
+  const catalogTotal = posCart.reduce((s, i) => s + getItemDiscountedPrice(i) * i.quantity, 0);
   const freeTotal = freeItems.reduce((s, i) => s + i.price, 0);
   const subtotal = catalogTotal + freeTotal;
+  // Remise totale par article (pour affichage)
+  const itemDiscountTotal = posCart.reduce((s, i) => {
+    return s + (i.product.price - getItemDiscountedPrice(i)) * i.quantity;
+  }, 0);
 
   const discountAmt = useMemo(() => {
     const v = parseFloat(discountValue) || 0;
@@ -151,6 +171,7 @@ export function CaisseSystem() {
     setConfirmed(true);
     setTimeout(() => {
       setPosCart([]); setFreeItems([]); setDiscountValue(''); setEmail('');
+      setItemDiscounts({}); setEditingDiscountKey(null);
       setShowPayment(false); setConfirmed(false);
     }, 4000);
   };
@@ -368,34 +389,87 @@ export function CaisseSystem() {
               <ul className="divide-y divide-[var(--border-soft)]">
                 {posCart.map((i, idx) => {
                   const imageUrl = i.product.images?.[0] || i.product.image;
+                  const lineKey = getItemLineKey(i);
+                  const discountedPrice = getItemDiscountedPrice(i);
+                  const hasItemDiscount = discountedPrice < i.product.price;
+                  const isEditingDiscount = editingDiscountKey === lineKey;
+                  const d = itemDiscounts[lineKey];
                   return (
-                  <li key={`${i.product.id}-${i.variantId || idx}`} className="flex gap-4 p-5 hover:bg-[var(--bg-alt)] transition-colors">
-                    <div className="w-12 h-16 relative flex-shrink-0 rounded-xs overflow-hidden bg-[var(--bg-alt)] flex items-center justify-center text-center">
-                      {imageUrl ? (
-                        <Image src={imageUrl} alt="" fill className="object-cover" />
-                      ) : (
-                        <span className="text-[7px] text-[var(--text-muted)] uppercase tracking-widest px-1">Sans Image</span>
-                      )}
-                    </div>
-                    <div className="flex-1 flex flex-col justify-center">
-                      <p className="text-xs font-medium">{i.product.name}</p>
-                      {(i.size || i.color) && (
-                        <p className="text-[9px] tracking-widest uppercase text-[var(--text-muted)] mt-1">
-                          {i.color && <span>Couleur: {i.color} </span>}
-                          {i.size && <span>{i.color ? '• ' : ''}Taille: {i.size}</span>}
-                        </p>
-                      )}
-                      <p className="text-sm font-medium mt-1">{i.product.price.toFixed(2)} €</p>
-                    </div>
-                    <div className="flex flex-col items-end justify-center gap-2">
-                      <div className="flex items-center border border-[var(--border-soft)] rounded-sm bg-white overflow-hidden">
-                        <button onClick={() => changeQty(i.product.id, i.variantId, -1)} className="p-1.5 hover:bg-[var(--bg-alt)] transition-colors"><Minus size={12} /></button>
-                        <span className="text-xs font-medium w-6 text-center">{i.quantity}</span>
-                        <button onClick={() => changeQty(i.product.id, i.variantId, 1)} className="p-1.5 hover:bg-[var(--bg-alt)] transition-colors"><Plus size={12} /></button>
+                  <li key={`${i.product.id}-${i.variantId || idx}`} className="flex flex-col border-b border-[var(--border-soft)] hover:bg-[var(--bg-alt)] transition-colors">
+                    <div className="flex gap-4 p-5">
+                      <div className="w-12 h-16 relative flex-shrink-0 rounded-xs overflow-hidden bg-[var(--bg-alt)] flex items-center justify-center text-center">
+                        {imageUrl ? (
+                          <Image src={imageUrl} alt="" fill className="object-cover" />
+                        ) : (
+                          <span className="text-[7px] text-[var(--text-muted)] uppercase tracking-widest px-1">Sans Image</span>
+                        )}
+                      </div>
+                      <div className="flex-1 flex flex-col justify-center">
+                        <p className="text-xs font-medium">{i.product.name}</p>
+                        {(i.size || i.color) && (
+                          <p className="text-[9px] tracking-widest uppercase text-[var(--text-muted)] mt-1">
+                            {i.color && <span>Couleur: {i.color} </span>}
+                            {i.size && <span>{i.color ? '• ' : ''}Taille: {i.size}</span>}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          {hasItemDiscount && (
+                            <span className="text-[10px] line-through text-[var(--text-muted)]">{i.product.price.toFixed(2)} €</span>
+                          )}
+                          <p className={`text-sm font-medium ${hasItemDiscount ? 'text-red-600' : ''}`}>
+                            {discountedPrice.toFixed(2)} €
+                          </p>
+                          {hasItemDiscount && (
+                            <span className="text-[9px] bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-sm font-medium">
+                              -{((1 - discountedPrice / i.product.price) * 100).toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end justify-between gap-2">
+                        <div className="flex items-center border border-[var(--border-soft)] rounded-sm bg-white overflow-hidden">
+                          <button onClick={() => changeQty(i.product.id, i.variantId, -1)} className="p-1.5 hover:bg-[var(--bg-alt)] transition-colors"><Minus size={12} /></button>
+                          <span className="text-xs font-medium w-6 text-center">{i.quantity}</span>
+                          <button onClick={() => changeQty(i.product.id, i.variantId, 1)} className="p-1.5 hover:bg-[var(--bg-alt)] transition-colors"><Plus size={12} /></button>
+                        </div>
+                        <button
+                          onClick={() => setEditingDiscountKey(isEditingDiscount ? null : lineKey)}
+                          className={`flex items-center gap-1 text-[9px] font-medium uppercase tracking-widest px-2 py-1 rounded-sm border transition-colors ${hasItemDiscount ? 'bg-red-50 text-red-600 border-red-200' : 'border-[var(--border-soft)] text-[var(--text-muted)] hover:border-black hover:text-black'}`}
+                        >
+                          <Tag size={10} /> Remise
+                        </button>
                       </div>
                     </div>
+                    {isEditingDiscount && (
+                      <div className="flex items-center gap-2 px-5 pb-4">
+                        <button
+                          onClick={() => setItemDiscounts(prev => ({ ...prev, [lineKey]: { ...prev[lineKey] ?? { value: '', type: 'pct' }, type: 'pct' } }))}
+                          className={`px-3 py-1.5 text-[10px] font-medium uppercase rounded-sm border transition-colors ${(d?.type ?? 'pct') === 'pct' ? 'bg-black text-white border-black' : 'border-[var(--border-soft)] hover:bg-gray-100'}`}
+                        >%</button>
+                        <button
+                          onClick={() => setItemDiscounts(prev => ({ ...prev, [lineKey]: { ...prev[lineKey] ?? { value: '', type: 'fixed' }, type: 'fixed' } }))}
+                          className={`px-3 py-1.5 text-[10px] font-medium uppercase rounded-sm border transition-colors ${d?.type === 'fixed' ? 'bg-black text-white border-black' : 'border-[var(--border-soft)] hover:bg-gray-100'}`}
+                        >€</button>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder={(d?.type ?? 'pct') === 'pct' ? 'Ex: 10' : 'Ex: 5'}
+                          value={d?.value ?? ''}
+                          onChange={e => setItemDiscounts(prev => ({ ...prev, [lineKey]: { value: e.target.value, type: d?.type ?? 'pct' } }))}
+                          className="flex-1 px-3 py-1.5 text-sm border border-[var(--border-soft)] rounded-sm outline-none focus:border-black bg-white"
+                          autoFocus
+                        />
+                        {hasItemDiscount && (
+                          <button
+                            onClick={() => { const n = {...itemDiscounts}; delete n[lineKey]; setItemDiscounts(n); }}
+                            className="text-[10px] text-red-500 hover:underline whitespace-nowrap"
+                          >Retirer</button>
+                        )}
+                      </div>
+                    )}
                   </li>
-                )})}
+                  );
+                })}
                 {freeItems.map(fi => (
                   <li key={fi.id} className="flex gap-4 p-5 bg-[var(--bg-alt)]">
                     <div className="w-12 h-16 flex items-center justify-center border border-[var(--border-soft)] border-dashed rounded-xs bg-white text-[var(--text-muted)]"><Tag size={16} /></div>
@@ -431,7 +505,8 @@ export function CaisseSystem() {
             <div className="p-6 bg-white">
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-xs font-medium text-[var(--text-muted)]"><span>Sous-total</span><span>{subtotal.toFixed(2)} €</span></div>
-                {discountAmt > 0 && <div className="flex justify-between text-xs font-medium text-red-500"><span>Remise</span><span>-{discountAmt.toFixed(2)} €</span></div>}
+                {itemDiscountTotal > 0 && <div className="flex justify-between text-xs font-medium text-orange-600"><span>Remises articles</span><span>-{itemDiscountTotal.toFixed(2)} €</span></div>}
+                {discountAmt > 0 && <div className="flex justify-between text-xs font-medium text-red-500"><span>Remise globale</span><span>-{discountAmt.toFixed(2)} €</span></div>}
                 <div className="flex justify-between pt-4 font-medium text-xl border-t border-[var(--border-soft)]">
                   <span>Total</span><span>{total.toFixed(2)} €</span>
                 </div>
