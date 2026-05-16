@@ -430,12 +430,12 @@ export default function AdminPage() {
                   )}
                   {editingProduct.variants.map((v, i) => (
                     <div key={i} className="flex gap-2 mb-2 items-center flex-wrap">
-                      <input type="text" placeholder="Taille" value={v.size || ''} onChange={e => {
-                        const newV = [...editingProduct.variants]; newV[i] = {...newV[i], size: e.target.value}; setEditingProduct({...editingProduct, variants: newV});
-                      }} className="w-16 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
                       <input type="text" placeholder="Couleur" value={v.color || ''} onChange={e => {
                         const newV = [...editingProduct.variants]; newV[i] = {...newV[i], color: e.target.value}; setEditingProduct({...editingProduct, variants: newV});
                       }} className="w-24 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
+                      <input type="text" placeholder="Taille" value={v.size || ''} onChange={e => {
+                        const newV = [...editingProduct.variants]; newV[i] = {...newV[i], size: e.target.value}; setEditingProduct({...editingProduct, variants: newV});
+                      }} className="w-16 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
                       <input type="number" placeholder="Stock" value={v.stock} min={0} onChange={e => {
                         const newV = [...editingProduct.variants]; newV[i] = {...newV[i], stock: parseInt(e.target.value)||0}; setEditingProduct({...editingProduct, variants: newV});
                       }} className="w-20 px-2 py-2 text-sm border border-[var(--border-soft)] rounded-sm" />
