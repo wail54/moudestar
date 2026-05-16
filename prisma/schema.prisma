@@ -27,6 +27,7 @@ model Product {
   name        String
   description String           @default("")
   price       Float
+  promoPrice  Float?           // Prix promotionnel (null = pas de promo active)
   images      String[]         // Galerie d'images (1ère = image principale)
   category    String
   featured    Boolean          @default(false)

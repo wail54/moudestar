@@ -21,7 +21,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, description, price, images, category, featured, sizeType, barcode, shortId, variants } = body;
+    const { name, description, price, promoPrice, images, category, featured, sizeType, barcode, shortId, variants } = body;
 
     if (!name || price == null) {
       return NextResponse.json({ error: 'Champs obligatoires manquants' }, { status: 400 });
@@ -32,6 +32,7 @@ export async function POST(req: Request) {
         name,
         description: description ?? '',
         price: Number(price),
+        promoPrice: promoPrice != null ? Number(promoPrice) : null,
         images: images ?? [],
         category,
         featured: featured ?? false,

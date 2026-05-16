@@ -143,7 +143,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           >
             <p className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)] mb-4">{product.category}</p>
             <h1 className="font-cormorant text-5xl md:text-6xl font-light mb-6 leading-tight">{product.name}</h1>
-            <p className="text-2xl font-medium mb-10">{product.price.toFixed(2)} €</p>
+            {(() => {
+              const hasPromo = product.promoPrice != null && product.promoPrice < product.price;
+              const displayPrice = hasPromo ? product.promoPrice! : product.price;
+              return (
+                <div className="flex items-center gap-4 mb-10">
+                  {hasPromo && (
+                    <span className="text-xl font-medium text-[var(--text-muted)] line-through">{product.price.toFixed(2)} €</span>
+                  )}
+                  <span className={`text-2xl font-medium ${hasPromo ? 'text-red-600' : ''}`}>{displayPrice.toFixed(2)} €</span>
+                  {hasPromo && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-sm">
+                      -{Math.round((1 - product.promoPrice! / product.price) * 100)}%
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
             
             <div className="prose prose-sm text-[var(--text-muted)] mb-10 leading-relaxed border-t border-[var(--border-soft)] pt-8">
               {product.description}

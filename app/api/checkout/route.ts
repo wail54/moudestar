@@ -84,17 +84,19 @@ export async function POST(req: Request) {
       };
     }
 
-    // Prix TTC directs — pas de multiplication par 1.20
+    // Prix TTC directs — utilise promoPrice si défini, sinon price normal
     const line_items_ttc = items.map((item: any) => {
       const variantName = [item.size, item.color].filter(Boolean).join(' - ');
+      const hasPromo = item.product.promoPrice != null && item.product.promoPrice < item.product.price;
+      const effectivePrice = hasPromo ? item.product.promoPrice : item.product.price;
       return {
         price_data: {
           currency: 'eur',
           product_data: {
-            name: item.product.name + (variantName ? ` (${variantName})` : ''),
+            name: item.product.name + (variantName ? ` (${variantName})` : '') + (hasPromo ? ' 🏷️' : ''),
             images: item.product.images?.length > 0 ? [item.product.images[0]] : (item.product.image ? [item.product.image] : []),
           },
-          unit_amount: Math.round(item.product.price * 100), // TTC
+          unit_amount: Math.round(effectivePrice * 100), // TTC
         },
         quantity: item.quantity,
       };

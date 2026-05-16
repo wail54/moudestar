@@ -8,12 +8,13 @@ export async function PATCH(req: Request, { params }: Params) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const { name, description, price, images, category, featured, sizeType, barcode, shortId, variants } = body;
+    const { name, description, price, promoPrice, images, category, featured, sizeType, barcode, shortId, variants } = body;
 
     const data: Record<string, any> = {};
     if (name !== undefined) data.name = name;
     if (description !== undefined) data.description = description;
     if (price !== undefined) data.price = Number(price);
+    if (promoPrice !== undefined) data.promoPrice = promoPrice != null ? Number(promoPrice) : null;
     if (images !== undefined) data.images = images;
     if (category !== undefined) data.category = category;
     if (featured !== undefined) data.featured = featured;

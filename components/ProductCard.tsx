@@ -8,6 +8,8 @@ export function ProductCard({ product }: { product: Product }) {
   const totalStock = product.variants?.reduce((acc, v) => acc + v.stock, 0) ?? 0;
   const isOos = product.sizeType !== 'NONE' && product.variants?.length > 0 && totalStock === 0;
   const imageUrl = product.images?.[0] || product.image;
+  const hasPromo = product.promoPrice != null && product.promoPrice < product.price;
+  const displayPrice = hasPromo ? product.promoPrice! : product.price;
 
   return (
     <Link href={`/boutique/${product.id}`} className="block group w-full">
@@ -28,6 +30,13 @@ export function ProductCard({ product }: { product: Product }) {
               <span className="text-[10px] tracking-widest uppercase font-medium bg-white px-4 py-2 rounded-xs shadow-sm">Épuisé</span>
             </div>
           )}
+          {hasPromo && !isOos && (
+            <div className="absolute top-3 left-3">
+              <span className="bg-red-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-sm shadow-sm">
+                Promo -{Math.round((1 - displayPrice / product.price) * 100)}%
+              </span>
+            </div>
+          )}
           {!isOos && (
             <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
               <div className="bg-white/90 backdrop-blur-md text-black text-[10px] tracking-widest uppercase font-medium py-3 text-center rounded-xs shadow-lg">
@@ -41,7 +50,14 @@ export function ProductCard({ product }: { product: Product }) {
           <p className="text-[10px] tracking-widest uppercase text-[var(--text-muted)] mb-1">{product.category}</p>
           <div className="flex items-start justify-between gap-4">
             <h3 className="text-sm font-medium leading-snug">{product.name}</h3>
-            <span className="text-sm font-medium">{product.price.toFixed(2)} €</span>
+            <div className="flex flex-col items-end flex-shrink-0">
+              {hasPromo && (
+                <span className="text-[10px] line-through text-[var(--text-muted)]">{product.price.toFixed(2)} €</span>
+              )}
+              <span className={`text-sm font-medium ${hasPromo ? 'text-red-600' : ''}`}>
+                {displayPrice.toFixed(2)} €
+              </span>
+            </div>
           </div>
         </div>
       </div>

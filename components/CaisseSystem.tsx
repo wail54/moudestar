@@ -77,21 +77,26 @@ export function CaisseSystem() {
     setFreeName(''); setFreePrice(''); setShowFree(false);
   };
 
-  // Helper : calcule le prix après remise pour une ligne
+  // Helper : prix effectif = promoPrice si défini, sinon price normal
+  const getEffectivePrice = (product: CartItem['product']): number =>
+    (product.promoPrice != null && product.promoPrice < product.price) ? product.promoPrice : product.price;
+
+  // Helper : calcule le prix après remise caisse pour une ligne (s'applique sur le prix effectif)
   const getItemLineKey = (i: CartItem) => `${i.product.id}-${i.variantId ?? ''}`;
   const getItemDiscountedPrice = (i: CartItem): number => {
+    const base = getEffectivePrice(i.product);
     const key = getItemLineKey(i);
     const d = itemDiscounts[key];
-    if (!d || !d.value) return i.product.price;
+    if (!d || !d.value) return base;
     const v = parseFloat(d.value) || 0;
-    if (d.type === 'pct') return Math.max(0, i.product.price * (1 - v / 100));
-    return Math.max(0, i.product.price - v);
+    if (d.type === 'pct') return Math.max(0, base * (1 - v / 100));
+    return Math.max(0, base - v);
   };
 
   const catalogTotal = posCart.reduce((s, i) => s + getItemDiscountedPrice(i) * i.quantity, 0);
   const freeTotal = freeItems.reduce((s, i) => s + i.price, 0);
   const subtotal = catalogTotal + freeTotal;
-  // Remise totale par article (pour affichage)
+  // Remise totale par article sur le prix de base original (promo + remise caisse)
   const itemDiscountTotal = posCart.reduce((s, i) => {
     return s + (i.product.price - getItemDiscountedPrice(i)) * i.quantity;
   }, 0);

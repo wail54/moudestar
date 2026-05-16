@@ -165,7 +165,8 @@ export default function AdminPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: editingProduct.name, price: editingProduct.price, description: editingProduct.description,
+        name: editingProduct.name, price: editingProduct.price, promoPrice: editingProduct.promoPrice ?? null,
+        description: editingProduct.description,
         images: editingProduct.images, variants: editingProduct.variants, sizeType: editingProduct.sizeType,
         barcode: editingProduct.barcode, shortId: editingProduct.shortId, category: editingProduct.category,
         featured: editingProduct.featured
@@ -352,6 +353,19 @@ export default function AdminPage() {
                   <div>
                     <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Prix (€)</label>
                     <input type="number" step="0.01" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)||0})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">
+                      Prix Promo (€) <span className="ml-1 text-orange-500 font-semibold">%</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Vide = pas de promo"
+                      value={editingProduct.promoPrice ?? ''}
+                      onChange={e => setEditingProduct({...editingProduct, promoPrice: e.target.value ? parseFloat(e.target.value) : null})}
+                      className="w-full px-4 py-3 bg-orange-50 outline-none rounded-sm text-sm border border-orange-200 focus:border-orange-400 transition-colors placeholder-orange-300"
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Catégorie</label>
@@ -744,6 +758,19 @@ export default function AdminPage() {
                     <div>
                       <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Prix (€)</label>
                       <input type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} className="w-full px-4 py-3 bg-white outline-none rounded-sm text-sm border border-[var(--border-soft)] focus:border-black transition-colors" required />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">
+                        Prix Promo (€) <span className="ml-1 text-orange-500 font-semibold">%</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Vide = pas de promo"
+                        value={(form as any).promoPrice ?? ''}
+                        onChange={e => setForm({...form, ...{promoPrice: e.target.value ? parseFloat(e.target.value) : null}} as any)}
+                        className="w-full px-4 py-3 bg-orange-50 outline-none rounded-sm text-sm border border-orange-200 focus:border-orange-400 transition-colors placeholder-orange-300"
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] tracking-widest uppercase font-medium text-[var(--text-muted)] mb-2">Catégorie</label>

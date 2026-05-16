@@ -23,6 +23,7 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  promoPrice?: number | null;  // Prix promotionnel (null = pas de promo)
   images: string[];
   category: string;
   featured: boolean;
